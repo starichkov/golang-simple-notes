@@ -25,8 +25,8 @@ func TestMongoDBStorage(t *testing.T) {
 	ctx := context.Background()
 
 	// Start MongoDB container
-	mongodbContainer, err := mongodb.RunContainer(ctx,
-		testcontainers.WithImage("mongo:7.0.7"),
+	mongodbContainer, err := mongodb.Run(ctx,
+		"mongo:7.0.20-jammy",
 		mongodb.WithUsername("admin"),
 		mongodb.WithPassword("password"),
 	)
@@ -36,7 +36,7 @@ func TestMongoDBStorage(t *testing.T) {
 
 	// Make sure to terminate the container at the end of the test
 	defer func() {
-		if err := mongodbContainer.Terminate(ctx); err != nil {
+		if err := testcontainers.TerminateContainer(mongodbContainer); err != nil {
 			t.Logf("Failed to terminate MongoDB container: %v", err)
 		}
 	}()
@@ -177,8 +177,8 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 	ctx := context.Background()
 
 	// Start MongoDB container
-	mongodbContainer, err := mongodb.RunContainer(ctx,
-		testcontainers.WithImage("mongo:7.0.7"),
+	mongodbContainer, err := mongodb.Run(ctx,
+		"mongo:7.0.20-jammy",
 		mongodb.WithUsername("admin"),
 		mongodb.WithPassword("password"),
 	)
@@ -188,7 +188,7 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 
 	// Make sure to terminate the container at the end of the test
 	defer func() {
-		if err := mongodbContainer.Terminate(ctx); err != nil {
+		if err := testcontainers.TerminateContainer(mongodbContainer); err != nil {
 			t.Logf("Failed to terminate MongoDB container: %v", err)
 		}
 	}()
