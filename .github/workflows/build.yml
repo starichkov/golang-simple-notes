@@ -29,25 +29,12 @@ jobs:
         run: go test -v -short ./...
 
       - name: Run integration tests with coverage
-        run: |
-          go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-          go tool cover -html=coverage.txt -o coverage.html
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: |
-            coverage.txt
-            coverage.html
+        run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.txt
-          slug: starichkov/golang-simple-notes
-          fail_ci_if_error: true
 
   docker:
     runs-on: ubuntu-24.04
