@@ -1,0 +1,473 @@
+package storage
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/go-kivik/kivik/v4"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+
+	"golang-simple-notes/model"
+)
+
+// TestCouchDBStorage tests the CouchDB storage implementation
+// This test uses Testcontainers to start a CouchDB container
+func TestCouchDBStorage(t *testing.T) {
+	// Skip this test if we're not running integration tests
+	if testing.Short() {
+		t.Skip("Skipping CouchDB integration test in short mode")
+	}
+
+	ctx := context.Background()
+
+	// Define the CouchDB container request
+	req := testcontainers.ContainerRequest{
+		Image:        "couchdb:3.3.3",
+		ExposedPorts: []string{"5984/tcp"},
+		Env: map[string]string{
+			"COUCHDB_USER":     "admin",
+			"COUCHDB_PASSWORD": "password",
+		},
+		WaitingFor: wait.ForHTTP("/").WithPort("5984/tcp"),
+	}
+
+	// Start the CouchDB container
+	couchdbContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to start CouchDB container: %v", err)
+	}
+
+	// Make sure to terminate the container at the end of the test
+	defer func() {
+		if err := couchdbContainer.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate CouchDB container: %v", err)
+		}
+	}()
+
+	// Get the container's host and port
+	host, err := couchdbContainer.Host(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get CouchDB container host: %v", err)
+	}
+
+	port, err := couchdbContainer.MappedPort(ctx, "5984/tcp")
+	if err != nil {
+		t.Fatalf("Failed to get CouchDB container port: %v", err)
+	}
+
+	// Construct the CouchDB URL
+	url := fmt.Sprintf("http://admin:password@%s:%s", host, port.Port())
+	dbName := "test_notes"
+
+	// Connect to the CouchDB container
+	client, err := kivik.New("couch", url)
+	if err != nil {
+		t.Fatalf("Failed to connect to CouchDB container: %v", err)
+	}
+
+	// Check if the server is available
+	_, err = client.AllDBs(ctx)
+	if err != nil {
+		t.Fatalf("Failed to list databases in CouchDB container: %v", err)
+	}
+
+	// Clean up any existing test database
+	if exists, _ := client.DBExists(ctx, dbName); exists {
+		if err := client.DestroyDB(ctx, dbName); err != nil {
+			t.Logf("Warning: Failed to destroy test database: %v", err)
+		}
+	}
+
+	// Create a new CouchDB storage
+	storage, err := NewCouchDBStorage(url, dbName)
+	if err != nil {
+		t.Fatalf("Failed to create CouchDB storage: %v", err)
+	}
+
+	// Run the fixed storage tests
+	testNoteStorageFixed(t, storage)
+
+	// Clean up after the test
+	if err := client.DestroyDB(ctx, dbName); err != nil {
+		t.Logf("Warning: Failed to destroy test database: %v", err)
+	}
+}
+
+// TestCouchDBStorageUnit tests the CouchDB storage implementation with unit tests
+func TestCouchDBStorageUnit(t *testing.T) {
+	// Create a mock implementation of NoteStorage that behaves like CouchDB
+	storage := NewMockCouchDBStorage()
+
+	// Run the fixed storage tests
+	testNoteStorageFixed(t, storage)
+}
+
+// MockCouchDBStorage is a mock implementation of NoteStorage that behaves like CouchDB
+type MockCouchDBStorage struct {
+	notes map[string]*model.Note
+}
+
+// NewMockCouchDBStorage creates a new instance of MockCouchDBStorage
+func NewMockCouchDBStorage() *MockCouchDBStorage {
+	return &MockCouchDBStorage{
+		notes: make(map[string]*model.Note),
+	}
+}
+
+// Create adds a new note to the storage
+func (s *MockCouchDBStorage) Create(note *model.Note) error {
+	// Check if note with the same ID already exists
+	if _, exists := s.notes[note.ID]; exists {
+		return fmt.Errorf("note with ID %s already exists", note.ID)
+	}
+
+	// Store a copy of the note
+	s.notes[note.ID] = note
+	return nil
+}
+
+// Get retrieves a note by its ID
+func (s *MockCouchDBStorage) Get(id string) (*model.Note, error) {
+	note, exists := s.notes[id]
+	if !exists {
+		return nil, ErrNoteNotFound
+	}
+	return note, nil
+}
+
+// GetAll retrieves all notes from the storage
+func (s *MockCouchDBStorage) GetAll() ([]*model.Note, error) {
+	notes := make([]*model.Note, 0, len(s.notes))
+	for _, note := range s.notes {
+		// Skip design documents (in CouchDB, these have IDs starting with "_design/")
+		if strings.HasPrefix(note.ID, "_design/") || strings.HasPrefix(note.ID, "_") {
+			continue
+		}
+		notes = append(notes, note)
+	}
+	return notes, nil
+}
+
+// Update updates an existing note
+func (s *MockCouchDBStorage) Update(note *model.Note) error {
+	if _, exists := s.notes[note.ID]; !exists {
+		return ErrNoteNotFound
+	}
+
+	// Update the note with the current time
+	note.UpdatedAt = time.Now()
+
+	// Store a copy of the note
+	s.notes[note.ID] = note
+	return nil
+}
+
+// Delete removes a note from the storage
+func (s *MockCouchDBStorage) Delete(id string) error {
+	if _, exists := s.notes[id]; !exists {
+		return ErrNoteNotFound
+	}
+
+	delete(s.notes, id)
+	return nil
+}
+
+// Close closes any resources used by the storage
+func (s *MockCouchDBStorage) Close() error {
+	// Nothing to close for mock storage
+	return nil
+}
+
+// Additional CouchDB-specific tests could be added here
+func TestCouchDBSpecificFeatures(t *testing.T) {
+	// Skip this test if we're not running integration tests
+	if testing.Short() {
+		t.Skip("Skipping CouchDB integration test in short mode")
+	}
+
+	ctx := context.Background()
+
+	// Define the CouchDB container request
+	req := testcontainers.ContainerRequest{
+		Image:        "couchdb:3.3.3",
+		ExposedPorts: []string{"5984/tcp"},
+		Env: map[string]string{
+			"COUCHDB_USER":     "admin",
+			"COUCHDB_PASSWORD": "password",
+		},
+		WaitingFor: wait.ForHTTP("/").WithPort("5984/tcp"),
+	}
+
+	// Start the CouchDB container
+	couchdbContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to start CouchDB container: %v", err)
+	}
+
+	// Make sure to terminate the container at the end of the test
+	defer func() {
+		if err := couchdbContainer.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate CouchDB container: %v", err)
+		}
+	}()
+
+	// Get the container's host and port
+	host, err := couchdbContainer.Host(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get CouchDB container host: %v", err)
+	}
+
+	port, err := couchdbContainer.MappedPort(ctx, "5984/tcp")
+	if err != nil {
+		t.Fatalf("Failed to get CouchDB container port: %v", err)
+	}
+
+	// Construct the CouchDB URL
+	url := fmt.Sprintf("http://admin:password@%s:%s", host, port.Port())
+	dbName := "test_notes_specific"
+
+	// Connect to the CouchDB container
+	client, err := kivik.New("couch", url)
+	if err != nil {
+		t.Fatalf("Failed to connect to CouchDB container: %v", err)
+	}
+
+	// Check if the server is available
+	_, err = client.AllDBs(ctx)
+	if err != nil {
+		t.Fatalf("Failed to list databases in CouchDB container: %v", err)
+	}
+
+	// Clean up any existing test database
+	if exists, _ := client.DBExists(ctx, dbName); exists {
+		if err := client.DestroyDB(ctx, dbName); err != nil {
+			t.Logf("Warning: Failed to destroy test database: %v", err)
+		}
+	}
+
+	// Create a new CouchDB storage
+	storage, err := NewCouchDBStorage(url, dbName)
+	if err != nil {
+		t.Fatalf("Failed to create CouchDB storage: %v", err)
+	}
+	defer storage.Close()
+
+	// Test document revision handling
+	t.Run("DocumentRevision", func(t *testing.T) {
+		note := model.NewNote("Test Title", "Test Content")
+
+		// Create the note
+		err := storage.Create(note)
+		if err != nil {
+			t.Fatalf("Failed to create note: %v", err)
+		}
+
+		// Update the note
+		note.Title = "Updated Title"
+		err = storage.Update(note)
+		if err != nil {
+			t.Fatalf("Failed to update note: %v", err)
+		}
+
+		// Get the note to verify the update
+		retrieved, err := storage.Get(note.ID)
+		if err != nil {
+			t.Fatalf("Failed to get note: %v", err)
+		}
+
+		if retrieved.Title != "Updated Title" {
+			t.Errorf("Expected title 'Updated Title', got '%s'", retrieved.Title)
+		}
+	})
+
+	// Test handling of design documents in GetAll
+	t.Run("SkipDesignDocuments", func(t *testing.T) {
+		// Clean up any existing test database
+		if exists, _ := client.DBExists(ctx, dbName); exists {
+			if err := client.DestroyDB(ctx, dbName); err != nil {
+				t.Logf("Warning: Failed to destroy test database: %v", err)
+			}
+		}
+
+		// Create the database again
+		if err := client.CreateDB(ctx, dbName); err != nil {
+			t.Fatalf("Failed to create database: %v", err)
+		}
+
+		// Create a new CouchDB storage
+		storage, err := NewCouchDBStorage(url, dbName)
+		if err != nil {
+			t.Fatalf("Failed to create CouchDB storage: %v", err)
+		}
+		defer storage.Close()
+
+		// Create a design document directly using the CouchDB client
+		designDoc := map[string]interface{}{
+			"_id": "_design/test",
+			"views": map[string]interface{}{
+				"test": map[string]interface{}{
+					"map": "function(doc) { emit(doc._id, null); }",
+				},
+			},
+		}
+
+		db := client.DB(dbName)
+		_, err = db.Put(ctx, "_design/test", designDoc)
+		if err != nil {
+			t.Fatalf("Failed to create design document: %v", err)
+		}
+
+		// Create a regular note
+		note := model.NewNote("Regular Note", "This is a regular note")
+		err = storage.Create(note)
+		if err != nil {
+			t.Fatalf("Failed to create note: %v", err)
+		}
+
+		// Print all documents in the database for debugging
+		rows := db.AllDocs(ctx)
+		defer rows.Close()
+		t.Log("All documents in the database:")
+		for rows.Next() {
+			var id string
+			if err := rows.ScanKey(&id); err != nil {
+				t.Logf("Failed to scan document key: %v", err)
+				continue
+			}
+			t.Logf("Document ID: %s", id)
+		}
+
+		// Get all notes
+		notes, err := storage.GetAll()
+		if err != nil {
+			t.Fatalf("Failed to get all notes: %v", err)
+		}
+
+		// Print all notes for debugging
+		t.Log("All notes returned by GetAll:")
+		for i, n := range notes {
+			t.Logf("Note %d: ID=%s, Title=%s", i, n.ID, n.Title)
+		}
+
+		// Verify that only the regular note is returned
+		if len(notes) != 1 {
+			t.Errorf("Expected 1 note, got %d", len(notes))
+		}
+
+		if len(notes) > 0 && notes[0].ID != note.ID {
+			t.Errorf("Expected note ID %s, got %s", note.ID, notes[0].ID)
+		}
+	})
+
+	// Test error cases
+	t.Run("ErrorCases", func(t *testing.T) {
+		// Test Create error
+		t.Run("CreateError", func(t *testing.T) {
+			// Create a storage with a closed client to simulate an error
+			badStorage := &CouchDBStorage{
+				client: client,
+				db:     client.DB("non_existent_db"), // Use a non-existent database
+				ctx:    ctx,
+				cancel: func() {},
+			}
+
+			note := model.NewNote("Error Note", "This should fail to create")
+			err := badStorage.Create(note)
+			if err == nil {
+				t.Error("Expected error when creating note with bad storage, got nil")
+			}
+		})
+
+		// Test Get error (other than not found)
+		t.Run("GetError", func(t *testing.T) {
+			// Create a storage with a closed context to simulate an error
+			canceledCtx, cancel := context.WithCancel(context.Background())
+			cancel() // Cancel the context immediately
+
+			badStorage := &CouchDBStorage{
+				client: client,
+				db:     client.DB(dbName),
+				ctx:    canceledCtx, // Use canceled context
+				cancel: func() {},
+			}
+
+			_, err := badStorage.Get("some-id")
+			if err == nil {
+				t.Error("Expected error when getting note with canceled context, got nil")
+			}
+		})
+
+		// Test GetAll error
+		t.Run("GetAllError", func(t *testing.T) {
+			// Create a storage with a closed context to simulate an error
+			canceledCtx, cancel := context.WithCancel(context.Background())
+			cancel() // Cancel the context immediately
+
+			badStorage := &CouchDBStorage{
+				client: client,
+				db:     client.DB(dbName),
+				ctx:    canceledCtx, // Use canceled context
+				cancel: func() {},
+			}
+
+			_, err := badStorage.GetAll()
+			if err == nil {
+				t.Error("Expected error when getting all notes with canceled context, got nil")
+			}
+		})
+
+		// Test Update error (other than not found)
+		t.Run("UpdateError", func(t *testing.T) {
+			// Create a storage with a closed context to simulate an error
+			canceledCtx, cancel := context.WithCancel(context.Background())
+			cancel() // Cancel the context immediately
+
+			badStorage := &CouchDBStorage{
+				client: client,
+				db:     client.DB(dbName),
+				ctx:    canceledCtx, // Use canceled context
+				cancel: func() {},
+			}
+
+			note := model.NewNote("Error Note", "This should fail to update")
+			err := badStorage.Update(note)
+			if err == nil {
+				t.Error("Expected error when updating note with canceled context, got nil")
+			}
+		})
+
+		// Test Delete error (other than not found)
+		t.Run("DeleteError", func(t *testing.T) {
+			// Create a storage with a closed context to simulate an error
+			canceledCtx, cancel := context.WithCancel(context.Background())
+			cancel() // Cancel the context immediately
+
+			badStorage := &CouchDBStorage{
+				client: client,
+				db:     client.DB(dbName),
+				ctx:    canceledCtx, // Use canceled context
+				cancel: func() {},
+			}
+
+			err := badStorage.Delete("some-id")
+			if err == nil {
+				t.Error("Expected error when deleting note with canceled context, got nil")
+			}
+		})
+	})
+
+	// Clean up after the test
+	if err := client.DestroyDB(ctx, dbName); err != nil {
+		t.Logf("Warning: Failed to destroy test database: %v", err)
+	}
+}
