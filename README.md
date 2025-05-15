@@ -6,6 +6,8 @@
 
 A simple microservice for notes management with REST and gRPC APIs, with support for multiple storage backends.
 
+**This project is generated using JetBrains Junie AI Coding Agent to evaluate agent's capabilities.**
+
 ## Features
 
 - REST API for CRUD operations on notes
