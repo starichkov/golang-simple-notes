@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -79,6 +80,33 @@ func (s *MockStorage) Close() error {
 	return nil
 }
 
+// ErrorMockStorage is a mock storage that returns an error on Create
+type ErrorMockStorage struct{}
+
+func (s *ErrorMockStorage) Create(note *model.Note) error {
+	return fmt.Errorf("mock error")
+}
+
+func (s *ErrorMockStorage) Get(id string) (*model.Note, error) {
+	return nil, storage.ErrNoteNotFound
+}
+
+func (s *ErrorMockStorage) GetAll() ([]*model.Note, error) {
+	return nil, nil
+}
+
+func (s *ErrorMockStorage) Update(note *model.Note) error {
+	return storage.ErrNoteNotFound
+}
+
+func (s *ErrorMockStorage) Delete(id string) error {
+	return storage.ErrNoteNotFound
+}
+
+func (s *ErrorMockStorage) Close() error {
+	return nil
+}
+
 // TestSetupRESTServer tests the setupRESTServer function
 func TestSetupRESTServer(t *testing.T) {
 	mockStorage := NewMockStorage()
@@ -119,6 +147,80 @@ func TestInitializeStorage(t *testing.T) {
 
 	// Clean up
 	defer storage.Close()
+}
+
+// TestInitializeStorageWithCouchDB tests the initializeStorage function with CouchDB
+func TestInitializeStorageWithCouchDB(t *testing.T) {
+	// Set environment variables for CouchDB
+	os.Setenv("STORAGE_TYPE", "couchdb")
+	os.Setenv("COUCHDB_URL", "http://invalid-url:5984") // Invalid URL to force fallback
+	defer func() {
+		os.Unsetenv("STORAGE_TYPE")
+		os.Unsetenv("COUCHDB_URL")
+	}()
+
+	// This should fall back to in-memory storage
+	storage := initializeStorage()
+
+	if storage == nil {
+		t.Fatal("Expected storage to be non-nil")
+	}
+
+	// Clean up
+	defer storage.Close()
+}
+
+// TestInitializeStorageWithMongoDB tests the initializeStorage function with MongoDB
+func TestInitializeStorageWithMongoDB(t *testing.T) {
+	// Set environment variables for MongoDB
+	os.Setenv("STORAGE_TYPE", "mongodb")
+	os.Setenv("MONGODB_URI", "mongodb://invalid-url:27017") // Invalid URL to force fallback
+	defer func() {
+		os.Unsetenv("STORAGE_TYPE")
+		os.Unsetenv("MONGODB_URI")
+	}()
+
+	// This should fall back to in-memory storage
+	storage := initializeStorage()
+
+	if storage == nil {
+		t.Fatal("Expected storage to be non-nil")
+	}
+
+	// Clean up
+	defer storage.Close()
+}
+
+// TestRunServersSimple tests a simplified version of runServers
+func TestRunServersSimple(t *testing.T) {
+	// This test doesn't actually call runServers() because it would start servers
+	// and block waiting for shutdown. Instead, we test the individual components
+	// that runServers() calls, which we've already tested separately.
+
+	// Create a mock storage
+	mockStorage := NewMockStorage()
+
+	// Test that setupRESTServer works with our mock storage
+	restServer := setupRESTServer(mockStorage)
+	if restServer == nil {
+		t.Fatal("setupRESTServer returned nil")
+	}
+
+	// Test that setupGRPCServer works with our mock storage
+	grpcServer := setupGRPCServer(mockStorage)
+	if grpcServer == nil {
+		t.Fatal("setupGRPCServer returned nil")
+	}
+
+	// Test that createSampleNotes works with our mock storage
+	createSampleNotes(mockStorage)
+	notes, err := mockStorage.GetAll()
+	if err != nil {
+		t.Fatalf("Failed to get notes: %v", err)
+	}
+	if len(notes) != 3 {
+		t.Errorf("Expected 3 notes, got %d", len(notes))
+	}
 }
 
 // TestCreateSampleNotes tests the createSampleNotes function
@@ -174,4 +276,10 @@ func TestCreateSampleNotes(t *testing.T) {
 	if !foundEndpoints {
 		t.Error("Missing 'REST API Endpoints' note")
 	}
+
+	// Test error handling with a custom mock that always returns an error
+	errorMockStorage := &ErrorMockStorage{}
+
+	// This should not panic even though Create returns an error
+	createSampleNotes(errorMockStorage)
 }
