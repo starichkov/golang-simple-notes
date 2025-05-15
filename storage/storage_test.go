@@ -7,16 +7,13 @@ import (
 	"golang-simple-notes/model"
 )
 
-// TestInMemoryStorage tests the in-memory storage implementation
-func TestInMemoryStorage(t *testing.T) {
-	storage := NewInMemoryStorage()
-	testNoteStorage(t, storage)
-}
-
 // testNoteStorage is a helper function that tests any implementation of NoteStorage
 func testNoteStorage(t *testing.T, storage NoteStorage) {
 	// Test Create and Get
 	t.Run("Create and Get", func(t *testing.T) {
+		// Clean up any existing notes
+		cleanupStorage(t, storage)
+
 		note := model.NewNote("Test Title", "Test Content")
 
 		err := storage.Create(note)
@@ -44,8 +41,8 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 
 	// Test GetAll
 	t.Run("GetAll", func(t *testing.T) {
-		// Clear any existing notes by creating a new storage
-		storage = NewInMemoryStorage()
+		// Clean up any existing notes
+		cleanupStorage(t, storage)
 
 		// Create some notes
 		note1 := model.NewNote("Title 1", "Content 1")
@@ -92,6 +89,9 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 
 	// Test Update
 	t.Run("Update", func(t *testing.T) {
+		// Clean up any existing notes
+		cleanupStorage(t, storage)
+
 		note := model.NewNote("Original Title", "Original Content")
 
 		err := storage.Create(note)
@@ -136,6 +136,9 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 
 	// Test Delete
 	t.Run("Delete", func(t *testing.T) {
+		// Clean up any existing notes
+		cleanupStorage(t, storage)
+
 		note := model.NewNote("To Delete", "This note will be deleted")
 
 		err := storage.Create(note)
@@ -171,4 +174,20 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 			t.Errorf("Failed to close storage: %v", err)
 		}
 	})
+}
+
+// cleanupStorage is a helper function to clean up any existing notes in the storage
+func cleanupStorage(t *testing.T, storage NoteStorage) {
+	notes, err := storage.GetAll()
+	if err != nil {
+		t.Logf("Warning: Failed to get all notes for cleanup: %v", err)
+		return
+	}
+
+	for _, note := range notes {
+		err := storage.Delete(note.ID)
+		if err != nil {
+			t.Logf("Warning: Failed to delete note %s during cleanup: %v", note.ID, err)
+		}
+	}
 }

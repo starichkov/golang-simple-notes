@@ -92,7 +92,7 @@ func TestCouchDBStorage(t *testing.T) {
 	}
 
 	// Run the fixed storage tests
-	testNoteStorageFixed(t, storage)
+	testNoteStorage(t, storage)
 
 	// Clean up after the test
 	if err := client.DestroyDB(ctx, dbName); err != nil {
@@ -106,7 +106,7 @@ func TestCouchDBStorageUnit(t *testing.T) {
 	storage := NewMockCouchDBStorage()
 
 	// Run the fixed storage tests
-	testNoteStorageFixed(t, storage)
+	testNoteStorage(t, storage)
 }
 
 // MockCouchDBStorage is a mock implementation of NoteStorage that behaves like CouchDB

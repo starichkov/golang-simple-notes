@@ -1,6 +1,8 @@
 package grpc
 
 import (
+	"errors"
+	"net"
 	"testing"
 
 	"golang-simple-notes/model"
@@ -66,6 +68,44 @@ func (s *MockStorage) Close() error {
 	return nil
 }
 
+// FailingMockStorage is a mock implementation that always returns errors
+type FailingMockStorage struct{}
+
+// NewFailingMockStorage creates a new instance of FailingMockStorage
+func NewFailingMockStorage() *FailingMockStorage {
+	return &FailingMockStorage{}
+}
+
+// Create always returns an error
+func (s *FailingMockStorage) Create(note *model.Note) error {
+	return errors.New("mock storage create error")
+}
+
+// Get always returns an error
+func (s *FailingMockStorage) Get(id string) (*model.Note, error) {
+	return nil, errors.New("mock storage get error")
+}
+
+// GetAll always returns an error
+func (s *FailingMockStorage) GetAll() ([]*model.Note, error) {
+	return nil, errors.New("mock storage getall error")
+}
+
+// Update always returns an error
+func (s *FailingMockStorage) Update(note *model.Note) error {
+	return errors.New("mock storage update error")
+}
+
+// Delete always returns an error
+func (s *FailingMockStorage) Delete(id string) error {
+	return errors.New("mock storage delete error")
+}
+
+// Close always returns an error
+func (s *FailingMockStorage) Close() error {
+	return errors.New("mock storage close error")
+}
+
 // TestNewServer tests the creation of a new server
 func TestNewServer(t *testing.T) {
 	mockStorage := NewMockStorage()
@@ -94,6 +134,27 @@ func TestStart(t *testing.T) {
 	err := server.Start()
 	if err != nil {
 		t.Errorf("Expected Start to return nil, got %v", err)
+	}
+}
+
+// TestStartError tests error handling in the Start method
+func TestStartError(t *testing.T) {
+	mockStorage := NewMockStorage()
+
+	// First, create a listener on the port we want to use
+	listener, err := net.Listen("tcp", ":8082")
+	if err != nil {
+		t.Fatalf("Failed to create listener for test: %v", err)
+	}
+	defer listener.Close()
+
+	// Now try to start a server on the same port, which should fail
+	server := NewServer(mockStorage, 8082)
+	err = server.Start()
+
+	// We expect an error because the port is already in use
+	if err == nil {
+		t.Fatal("Expected error when starting server on already used port, got nil")
 	}
 }
 
@@ -278,5 +339,60 @@ func TestDeleteNote(t *testing.T) {
 	err = server.DeleteNote("non-existent-id")
 	if err == nil {
 		t.Error("Expected error when deleting non-existent note, got nil")
+	}
+}
+
+// TestCreateNoteError tests error handling in the CreateNote method
+func TestCreateNoteError(t *testing.T) {
+	failingStorage := NewFailingMockStorage()
+	server := NewServer(failingStorage, 8081)
+
+	_, err := server.CreateNote("Test Title", "Test Content")
+	if err == nil {
+		t.Fatal("Expected error when creating note with failing storage, got nil")
+	}
+}
+
+// TestGetNoteError tests error handling in the GetNote method
+func TestGetNoteError(t *testing.T) {
+	failingStorage := NewFailingMockStorage()
+	server := NewServer(failingStorage, 8081)
+
+	_, err := server.GetNote("any-id")
+	if err == nil {
+		t.Fatal("Expected error when getting note with failing storage, got nil")
+	}
+}
+
+// TestGetAllNotesError tests error handling in the GetAllNotes method
+func TestGetAllNotesError(t *testing.T) {
+	failingStorage := NewFailingMockStorage()
+	server := NewServer(failingStorage, 8081)
+
+	_, err := server.GetAllNotes()
+	if err == nil {
+		t.Fatal("Expected error when getting all notes with failing storage, got nil")
+	}
+}
+
+// TestUpdateNoteError tests error handling in the UpdateNote method
+func TestUpdateNoteError(t *testing.T) {
+	failingStorage := NewFailingMockStorage()
+	server := NewServer(failingStorage, 8081)
+
+	_, err := server.UpdateNote("any-id", "Updated Title", "Updated Content")
+	if err == nil {
+		t.Fatal("Expected error when updating note with failing storage, got nil")
+	}
+}
+
+// TestDeleteNoteError tests error handling in the DeleteNote method
+func TestDeleteNoteError(t *testing.T) {
+	failingStorage := NewFailingMockStorage()
+	server := NewServer(failingStorage, 8081)
+
+	err := server.DeleteNote("any-id")
+	if err == nil {
+		t.Fatal("Expected error when deleting note with failing storage, got nil")
 	}
 }

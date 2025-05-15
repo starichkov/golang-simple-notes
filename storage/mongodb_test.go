@@ -77,7 +77,7 @@ func TestMongoDBStorage(t *testing.T) {
 	}
 
 	// Run the fixed storage tests
-	testNoteStorageFixed(t, storage)
+	testNoteStorage(t, storage)
 
 	// Clean up after the test
 	err = client.Database(dbName).Collection(collectionName).Drop(ctx)
@@ -92,7 +92,7 @@ func TestMongoDBStorageUnit(t *testing.T) {
 	storage := NewMockMongoDBStorage()
 
 	// Run the fixed storage tests
-	testNoteStorageFixed(t, storage)
+	testNoteStorage(t, storage)
 }
 
 // MockMongoDBStorage is a mock implementation of NoteStorage that behaves like MongoDB
