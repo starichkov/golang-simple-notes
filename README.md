@@ -1,6 +1,8 @@
 # Notes Management API
 
-[![Build and Test](https://github.com/starichkov/golang-simple-notes/actions/workflows/build.yml/badge.svg?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/actions/workflows/build.yml)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/starichkov/golang-simple-notes/build.yml?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/actions/workflows/build.yml)
+[![Codecov](https://img.shields.io/codecov/c/github/starichkov/golang-simple-notes?style=for-the-badge)](https://codecov.io/gh/starichkov/golang-simple-notes)
+[![GitHub License](https://img.shields.io/github/license/starichkov/golang-simple-notes?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/blob/main/LICENSE.md)
 
 A simple microservice for notes management with REST and gRPC APIs, with support for multiple storage backends.
 
