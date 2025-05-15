@@ -243,6 +243,8 @@ To view the latest build status and test results, click on the build status badg
 
 The GitHub Actions workflow generates code coverage reports for the tests. These reports are available as artifacts in the workflow runs and can be downloaded to analyze test coverage.
 
+Additionally, code coverage reports are automatically uploaded to [Codecov](https://codecov.io) for visualization and tracking of coverage trends over time.
+
 ## Configuration
 
 The application can be configured using environment variables:

@@ -41,6 +41,13 @@ jobs:
             coverage.txt
             coverage.html
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.txt
+          fail_ci_if_error: true
+
   docker:
     runs-on: ubuntu-24.04
     needs: build
