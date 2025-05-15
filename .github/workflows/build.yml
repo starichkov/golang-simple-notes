@@ -46,6 +46,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
+          slug: starichkov/golang-simple-notes
           fail_ci_if_error: true
 
   docker:
