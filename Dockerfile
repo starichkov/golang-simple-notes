@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o notes-api .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o notes-api .
 
 # Use a minimal alpine image for the final image
 FROM alpine:3.21

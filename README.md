@@ -24,6 +24,20 @@ A simple microservice for notes management with REST and gRPC APIs, with support
 - Docker and Docker Compose
 - Go 1.24 or later (for local development)
 
+## Compilation
+
+To compile the application, you can use the following command:
+
+```bash
+# helps to keep unnecessary dependencies out, which can indirectly reduce size of the binary
+go mod tidy
+go build -ldflags="-s -w"
+```
+
+where:
+- removes the symbol table and debug info. `-s`
+- removes DWARF debugging information. `-w`
+
 ## Running with Docker Compose
 
 The easiest way to run the application is using Docker Compose, which will start both the API services and the databases:
