@@ -1,91 +1,18 @@
-version: '3.8'
-
 services:
-  # CouchDB service
-  couchdb:
-    image: couchdb:3.3.3
-    container_name: notes-couchdb
-    environment:
-      - COUCHDB_USER=admin
-      - COUCHDB_PASSWORD=password
-    ports:
-      - "5984:5984"
-    volumes:
-      - couchdb-data:/opt/couchdb/data
-    networks:
-      - notes-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5984"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # MongoDB service
-  mongodb:
-    image: mongo:7.0.20-jammy
-    container_name: notes-mongodb
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=password
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb-data:/data/db
-    networks:
-      - notes-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Notes API service with CouchDB
-  notes-api-couchdb:
+  # Notes API service with in-memory storage
+  notes-api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: notes-api-couchdb
-    depends_on:
-      couchdb:
-        condition: service_healthy
+    container_name: notes-api-memory
     environment:
-      - STORAGE_TYPE=couchdb
-      - COUCHDB_URL=http://admin:password@couchdb:5984
-      - COUCHDB_DB=notes
+      - STORAGE_TYPE=memory
     ports:
       - "8080:8080"
       - "8081:8081"
     networks:
       - notes-network
     restart: on-failure
-
-  # Notes API service with MongoDB
-  notes-api-mongodb:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: notes-api-mongodb
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    environment:
-      - STORAGE_TYPE=mongodb
-      - MONGODB_URI=mongodb://admin:password@mongodb:27017
-      - MONGODB_DB=notes
-      - MONGODB_COLLECTION=notes
-    ports:
-      - "8082:8080"
-      - "8083:8081"
-    networks:
-      - notes-network
-    restart: on-failure
-
-# Volumes
-volumes:
-  couchdb-data:
-    driver: local
-  mongodb-data:
-    driver: local
 
 # Networks
 networks:

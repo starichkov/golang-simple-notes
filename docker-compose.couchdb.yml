@@ -1,0 +1,49 @@
+services:
+  # CouchDB service
+  couchdb:
+    image: couchdb:3.3.3
+    container_name: notes-couchdb
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=password
+    ports:
+      - "5984:5984"
+    volumes:
+      - couchdb-data:/opt/couchdb/data
+    networks:
+      - notes-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Notes API service with CouchDB
+  notes-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notes-api-couchdb
+    depends_on:
+      couchdb:
+        condition: service_healthy
+    environment:
+      - STORAGE_TYPE=couchdb
+      - COUCHDB_URL=http://admin:password@couchdb:5984
+      - COUCHDB_DB=notes
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    networks:
+      - notes-network
+    restart: on-failure
+
+# Volumes
+volumes:
+  couchdb-data:
+    driver: local
+
+# Networks
+networks:
+  notes-network:
+    driver: bridge

@@ -1,6 +1,6 @@
 module golang-simple-notes
 
-go 1.24
+go 1.24.3
 
 require (
 	github.com/go-kivik/kivik/v4 v4.4.0

@@ -1,0 +1,50 @@
+services:
+  # MongoDB service
+  mongodb:
+    image: mongo:7.0.20-jammy
+    container_name: notes-mongodb
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - notes-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Notes API service with MongoDB
+  notes-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notes-api-mongodb
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - STORAGE_TYPE=mongodb
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017
+      - MONGODB_DB=notes
+      - MONGODB_COLLECTION=notes
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    networks:
+      - notes-network
+    restart: on-failure
+
+# Volumes
+volumes:
+  mongodb-data:
+    driver: local
+
+# Networks
+networks:
+  notes-network:
+    driver: bridge

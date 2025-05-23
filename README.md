@@ -6,7 +6,7 @@
 
 A simple microservice for notes management with REST and gRPC APIs, with support for multiple storage backends.
 
-**This project is generated using JetBrains Junie AI Coding Agent to evaluate agent's capabilities.**
+**This project is generated using JetBrains Junie and several other AI coding agents, to evaluate agents capabilities.**
 
 ## Features
 
@@ -22,7 +22,7 @@ A simple microservice for notes management with REST and gRPC APIs, with support
 ## Prerequisites
 
 - Docker and Docker Compose
-- Go 1.24 or later (for local development)
+- Go 1.24.3 or later (for local development)
 
 ## Compilation
 
