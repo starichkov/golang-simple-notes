@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"golang-simple-notes/model"
 	"golang-simple-notes/storage"
@@ -51,20 +52,77 @@ func (h *Handler) handleNotes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleNote handles requests for the /api/notes/{id} endpoint
-func (h *Handler) handleNote(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+// isValidNoteID checks if a note ID is valid
+func isValidNoteID(id string) bool {
+	// ID should not be empty
 	if id == "" {
-		http.Error(w, "Note ID is required", http.StatusBadRequest)
-		return
+		return false
 	}
 
+	// ID should not contain spaces
+	if strings.Contains(id, " ") {
+		return false
+	}
+
+	// ID should not be too long (e.g., max 255 characters)
+	if len(id) > 255 {
+		return false
+	}
+
+	// ID should only contain alphanumeric characters, hyphens, and underscores
+	for _, c := range id {
+		if !isValidIDChar(c) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isValidIDChar checks if a character is valid in a note ID
+func isValidIDChar(c rune) bool {
+	return (c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') ||
+		c == '-' ||
+		c == '_'
+}
+
+// handleNote handles requests for the /api/notes/{id} endpoint
+func (h *Handler) handleNote(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		id := chi.URLParam(r, "id")
+		if id == "" {
+			http.Error(w, "Note ID is required", http.StatusBadRequest)
+			return
+		}
+		if !isValidNoteID(id) {
+			http.Error(w, "Invalid note ID format", http.StatusBadRequest)
+			return
+		}
 		h.getNote(w, r, id)
 	case http.MethodPut:
+		id := chi.URLParam(r, "id")
+		if id == "" {
+			http.Error(w, "Note ID is required", http.StatusBadRequest)
+			return
+		}
+		if !isValidNoteID(id) {
+			http.Error(w, "Invalid note ID format", http.StatusBadRequest)
+			return
+		}
 		h.updateNote(w, r, id)
 	case http.MethodDelete:
+		id := chi.URLParam(r, "id")
+		if id == "" {
+			http.Error(w, "Note ID is required", http.StatusBadRequest)
+			return
+		}
+		if !isValidNoteID(id) {
+			http.Error(w, "Invalid note ID format", http.StatusBadRequest)
+			return
+		}
 		h.deleteNote(w, r, id)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

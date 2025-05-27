@@ -7,12 +7,14 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"golang-simple-notes/model"
 	"golang-simple-notes/storage"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // MockStorage is a mock implementation of the NoteStorage interface for testing
@@ -275,8 +277,8 @@ func TestGetNote(t *testing.T) {
 		mockStorage := NewMockStorage()
 		handler := NewHandler(mockStorage)
 
-		// Add a note to the storage
-		note := model.NewNote("Test Title", "Test Content")
+		// Add a note to the storage with a valid ID
+		note := &model.Note{ID: "testid123", Title: "Test Title", Content: "Test Content"}
 		mockStorage.Create(context.Background(), note)
 
 		req := setupTestRequest("GET", "/api/notes/"+note.ID, "")
@@ -354,8 +356,8 @@ func TestUpdateNote(t *testing.T) {
 		mockStorage := NewMockStorage()
 		handler := NewHandler(mockStorage)
 
-		// Add a note to the storage
-		note := model.NewNote("Original Title", "Original Content")
+		// Add a note to the storage with a valid ID
+		note := &model.Note{ID: "testid123", Title: "Original Title", Content: "Original Content"}
 		mockStorage.Create(context.Background(), note)
 
 		reqBody := `{"title":"Updated Title","content":"Updated Content"}`
@@ -463,8 +465,8 @@ func TestDeleteNote(t *testing.T) {
 		mockStorage := NewMockStorage()
 		handler := NewHandler(mockStorage)
 
-		// Add a note to the storage
-		note := model.NewNote("Test Title", "Test Content")
+		// Add a note to the storage with a valid ID
+		note := &model.Note{ID: "testid123", Title: "Test Title", Content: "Test Content"}
 		mockStorage.Create(context.Background(), note)
 
 		req := setupTestRequest("DELETE", "/api/notes/"+note.ID, "")
@@ -523,4 +525,168 @@ func TestDeleteNote(t *testing.T) {
 			t.Errorf("Expected error message to contain 'Failed to delete note', got: %s", w.Body.String())
 		}
 	})
+}
+
+// TestHealthEndpoint tests the /health endpoint
+func TestHealthEndpoint(t *testing.T) {
+	mockStorage := NewMockStorage()
+	handler := NewHandler(mockStorage)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	t.Run("GET /health", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/health", nil)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected status code 200, got %d", w.Code)
+		}
+		if w.Body.String() != "OK" {
+			t.Errorf("Expected body 'OK', got '%s'", w.Body.String())
+		}
+	})
+
+	t.Run("Method Not Allowed", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/health", nil)
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+
+		if w.Code != http.StatusMethodNotAllowed {
+			t.Errorf("Expected status code 405, got %d", w.Code)
+		}
+		if !strings.Contains(w.Body.String(), "Method not allowed") {
+			t.Errorf("Expected error message to contain 'Method not allowed', got: %s", w.Body.String())
+		}
+	})
+}
+
+// TestEmptyNoteID tests that handleNote returns 400 Bad Request when the ID is empty
+func TestEmptyNoteID(t *testing.T) {
+	mockStorage := NewMockStorage()
+	handler := NewHandler(mockStorage)
+
+	req := setupTestRequest("GET", "/api/notes/", "")
+	chiCtx := chi.NewRouteContext()
+	chiCtx.URLParams.Add("id", "")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+	w := httptest.NewRecorder()
+
+	handler.handleNote(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status code 400, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "Note ID is required") {
+		t.Errorf("Expected error message to contain 'Note ID is required', got: %s", w.Body.String())
+	}
+}
+
+// TestUnsupportedMethods tests that unsupported methods return 405 Method Not Allowed
+func TestUnsupportedMethods(t *testing.T) {
+	mockStorage := NewMockStorage()
+	handler := NewHandler(mockStorage)
+
+	// Test unsupported methods on /api/notes
+	unsupportedMethods := []string{"PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"}
+	for _, method := range unsupportedMethods {
+		t.Run("Notes Endpoint - "+method, func(t *testing.T) {
+			req := setupTestRequest(method, "/api/notes", "")
+			w := httptest.NewRecorder()
+			handler.handleNotes(w, req)
+
+			if w.Code != http.StatusMethodNotAllowed {
+				t.Errorf("Expected status code 405 for %s, got %d", method, w.Code)
+			}
+			if !strings.Contains(w.Body.String(), "Method not allowed") {
+				t.Errorf("Expected error message to contain 'Method not allowed', got: %s", w.Body.String())
+			}
+		})
+	}
+
+	// Test unsupported methods on /api/notes/{id}
+	unsupportedNoteIDMethods := []string{"PATCH", "OPTIONS", "HEAD"}
+	for _, method := range unsupportedNoteIDMethods {
+		t.Run("Note Endpoint - "+method, func(t *testing.T) {
+			req := setupTestRequest(method, "/api/notes/test-id", "")
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("id", "test-id")
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+			w := httptest.NewRecorder()
+			handler.handleNote(w, req)
+
+			if w.Code != http.StatusMethodNotAllowed {
+				t.Errorf("Expected status code 405 for %s, got %d", method, w.Code)
+			}
+			if !strings.Contains(w.Body.String(), "Method not allowed") {
+				t.Errorf("Expected error message to contain 'Method not allowed', got: %s", w.Body.String())
+			}
+		})
+	}
+}
+
+// TestIsValidNoteID covers all branches of isValidNoteID
+func TestIsValidNoteID(t *testing.T) {
+	cases := []struct {
+		id    string
+		valid bool
+		name  string
+	}{
+		{"", false, "Empty"},
+		{"valid_id-123", true, "Valid"},
+		{"has space", false, "Space"},
+		{strings.Repeat("a", 256), false, "TooLong"},
+		{"invalid@id", false, "InvalidChar"},
+		{"UPPER_and-lower123", true, "MixedCase"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := isValidNoteID(c.id); got != c.valid {
+				t.Errorf("isValidNoteID(%q) = %v, want %v", c.id, got, c.valid)
+			}
+		})
+	}
+}
+
+// TestHandleNote_EmptyAndInvalidID tests empty and invalid IDs for PUT and DELETE methods
+func TestHandleNote_EmptyAndInvalidID(t *testing.T) {
+	mockStorage := NewMockStorage()
+	handler := NewHandler(mockStorage)
+
+	methods := []string{"PUT", "DELETE"}
+	invalidIDs := []struct {
+		id   string
+		msg  string
+		code int
+	}{
+		{"", "Note ID is required", http.StatusBadRequest},
+		{"invalid@id", "Invalid note ID format", http.StatusBadRequest},
+		{"has space", "Invalid note ID format", http.StatusBadRequest},
+		{strings.Repeat("a", 256), "Invalid note ID format", http.StatusBadRequest},
+	}
+
+	for _, method := range methods {
+		for _, tc := range invalidIDs {
+			t.Run(method+"/"+tc.id, func(t *testing.T) {
+				encodedID := tc.id
+				if encodedID != "" {
+					encodedID = url.PathEscape(tc.id)
+				}
+				req := setupTestRequest(method, "/api/notes/"+encodedID, "")
+				chiCtx := chi.NewRouteContext()
+				chiCtx.URLParams.Add("id", tc.id)
+				req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+				w := httptest.NewRecorder()
+
+				handler.handleNote(w, req)
+
+				if w.Code != tc.code {
+					t.Errorf("Expected status code %d, got %d", tc.code, w.Code)
+				}
+				if !strings.Contains(w.Body.String(), tc.msg) {
+					t.Errorf("Expected error message to contain '%s', got: %s", tc.msg, w.Body.String())
+				}
+			})
+		}
+	}
 }
