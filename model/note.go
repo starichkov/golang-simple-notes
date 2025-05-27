@@ -6,11 +6,12 @@ import (
 
 // Note represents a single note in the system
 type Note struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string    `json:"_id" bson:"_id"`
+	Rev       string    `json:"_rev,omitempty" bson:"_rev,omitempty"`
+	Title     string    `json:"title" bson:"title"`
+	Content   string    `json:"content" bson:"content"`
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 // NewNote creates a new note with the given title and content

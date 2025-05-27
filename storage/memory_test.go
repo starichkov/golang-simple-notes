@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -16,16 +17,17 @@ func TestInMemoryStorage(t *testing.T) {
 	storage := NewInMemoryStorage()
 
 	// Run the fixed storage tests
-	testNoteStorage(t, storage)
+	testNoteStorage(t, storage, context.Background())
 }
 
 // TestInMemoryStorageConcurrency tests the thread safety of the in-memory storage
 func TestInMemoryStorageConcurrency(t *testing.T) {
 	storage := NewInMemoryStorage()
+	ctx := context.Background()
 
 	// Create a note to work with
 	note := model.NewNote("Concurrency Test", "Testing concurrent access")
-	err := storage.Create(note)
+	err := storage.Create(ctx, note)
 	if err != nil {
 		t.Fatalf("Failed to create note: %v", err)
 	}
@@ -38,7 +40,7 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 		done := make(chan bool)
 		for i := 0; i < concurrentOps; i++ {
 			go func() {
-				_, err := storage.Get(note.ID)
+				_, err := storage.Get(ctx, note.ID)
 				if err != nil {
 					t.Errorf("Failed to get note: %v", err)
 				}
@@ -55,14 +57,14 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 	// Test concurrent writes
 	t.Run("ConcurrentWrites", func(t *testing.T) {
 		// Clean up storage before test
-		notes, _ := storage.GetAll()
+		notes, _ := storage.GetAll(ctx)
 		for _, n := range notes {
-			storage.Delete(n.ID)
+			storage.Delete(ctx, n.ID)
 		}
 
 		// Create the initial note again
 		note = model.NewNote("Concurrency Test", "Testing concurrent access")
-		err = storage.Create(note)
+		err = storage.Create(ctx, note)
 		if err != nil {
 			t.Fatalf("Failed to create note: %v", err)
 		}
@@ -83,7 +85,7 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 					UpdatedAt: time.Now(),
 				}
 
-				err := storage.Create(uniqueNote)
+				err := storage.Create(ctx, uniqueNote)
 				if err != nil {
 					t.Errorf("Failed to create note: %v", err)
 				} else {
@@ -108,7 +110,7 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 		}
 
 		// Verify that all notes were created
-		notes, err := storage.GetAll()
+		notes, err := storage.GetAll(ctx)
 		if err != nil {
 			t.Fatalf("Failed to get all notes: %v", err)
 		}
@@ -121,7 +123,7 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 
 		// Verify that each created note can be retrieved
 		for id := range createdIDs {
-			_, err := storage.Get(id)
+			_, err := storage.Get(ctx, id)
 			if err != nil {
 				t.Errorf("Failed to get created note with ID %s: %v", id, err)
 			}
@@ -132,7 +134,7 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 	t.Run("ConcurrentUpdates", func(t *testing.T) {
 		// Create a note to update
 		updateNote := model.NewNote("Update Test", "Testing concurrent updates")
-		err := storage.Create(updateNote)
+		err := storage.Create(ctx, updateNote)
 		if err != nil {
 			t.Fatalf("Failed to create note: %v", err)
 		}
@@ -160,7 +162,7 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 					UpdatedAt: time.Now(),
 				}
 
-				err := storage.Update(updatedNote)
+				err := storage.Update(ctx, updatedNote)
 				if err != nil {
 					t.Errorf("Failed to update note: %v", err)
 				}
@@ -175,7 +177,7 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 
 		// Verify that the note was updated (we don't check specific content
 		// since we don't know which goroutine's update was the last one)
-		retrieved, err := storage.Get(updateNote.ID)
+		retrieved, err := storage.Get(ctx, updateNote.ID)
 		if err != nil {
 			t.Fatalf("Failed to get updated note: %v", err)
 		}
@@ -188,9 +190,9 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 	// Test concurrent deletes
 	t.Run("ConcurrentDeletes", func(t *testing.T) {
 		// Clean up storage before test
-		notes, _ := storage.GetAll()
+		notes, _ := storage.GetAll(ctx)
 		for _, n := range notes {
-			storage.Delete(n.ID)
+			storage.Delete(ctx, n.ID)
 		}
 
 		// Create notes to delete with guaranteed unique IDs
@@ -199,34 +201,24 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 			uniqueID := fmt.Sprintf("delete-note-%d", i)
 			deleteNotes[i] = &model.Note{
 				ID:        uniqueID,
-				Title:     fmt.Sprintf("Delete Test %d", i),
-				Content:   fmt.Sprintf("Testing concurrent deletes %d", i),
+				Title:     fmt.Sprintf("Delete Note %d", i),
+				Content:   fmt.Sprintf("Created for deletion by goroutine %d", i),
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 			}
-			err := storage.Create(deleteNotes[i])
+
+			err := storage.Create(ctx, deleteNotes[i])
 			if err != nil {
-				t.Fatalf("Failed to create note: %v", err)
+				t.Fatalf("Failed to create note for deletion: %v", err)
 			}
 		}
-
-		// Use a mutex to protect access to the deleted IDs map
-		var deletedMutex sync.Mutex
-		deletedIDs := make(map[string]bool)
 
 		done := make(chan bool)
 		for i := 0; i < concurrentOps; i++ {
 			go func(i int) {
-				// Delete the note
-				noteID := deleteNotes[i].ID
-				err := storage.Delete(noteID)
+				err := storage.Delete(ctx, deleteNotes[i].ID)
 				if err != nil {
-					t.Errorf("Failed to delete note %s: %v", noteID, err)
-				} else {
-					// Record successful deletion
-					deletedMutex.Lock()
-					deletedIDs[noteID] = true
-					deletedMutex.Unlock()
+					t.Errorf("Failed to delete note: %v", err)
 				}
 				done <- true
 			}(i)
@@ -238,20 +230,13 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 		}
 
 		// Verify that all notes were deleted
-		for i := 0; i < concurrentOps; i++ {
-			noteID := deleteNotes[i].ID
+		notes, err := storage.GetAll(ctx)
+		if err != nil {
+			t.Fatalf("Failed to get all notes: %v", err)
+		}
 
-			// Only check notes that were successfully deleted
-			deletedMutex.Lock()
-			wasDeleted := deletedIDs[noteID]
-			deletedMutex.Unlock()
-
-			if wasDeleted {
-				_, err := storage.Get(noteID)
-				if err != ErrNoteNotFound {
-					t.Errorf("Expected ErrNoteNotFound for note %s, got %v", noteID, err)
-				}
-			}
+		if len(notes) != 0 {
+			t.Errorf("Expected 0 notes after deletion, got %d", len(notes))
 		}
 	})
 }
@@ -270,13 +255,13 @@ func TestInMemoryStorageEdgeCases(t *testing.T) {
 			UpdatedAt: time.Now(),
 		}
 
-		err := storage.Create(note)
+		err := storage.Create(context.Background(), note)
 		if err != nil {
 			t.Errorf("Failed to create note with empty ID: %v", err)
 		}
 
 		// Try to retrieve the note
-		_, err = storage.Get("")
+		_, err = storage.Get(context.Background(), "")
 		if err != nil {
 			t.Errorf("Failed to get note with empty ID: %v", err)
 		}
@@ -292,13 +277,13 @@ func TestInMemoryStorageEdgeCases(t *testing.T) {
 			UpdatedAt: time.Now(),
 		}
 
-		err := storage.Update(note)
+		err := storage.Update(context.Background(), note)
 		if err != nil {
 			t.Errorf("Failed to update note with empty ID: %v", err)
 		}
 
 		// Retrieve the note to verify the update
-		retrieved, err := storage.Get("")
+		retrieved, err := storage.Get(context.Background(), "")
 		if err != nil {
 			t.Errorf("Failed to get updated note with empty ID: %v", err)
 		}
@@ -310,13 +295,13 @@ func TestInMemoryStorageEdgeCases(t *testing.T) {
 
 	// Test deleting a note with an empty ID
 	t.Run("DeleteEmptyID", func(t *testing.T) {
-		err := storage.Delete("")
+		err := storage.Delete(context.Background(), "")
 		if err != nil {
 			t.Errorf("Failed to delete note with empty ID: %v", err)
 		}
 
 		// Try to retrieve the deleted note
-		_, err = storage.Get("")
+		_, err = storage.Get(context.Background(), "")
 		if err != ErrNoteNotFound {
 			t.Errorf("Expected ErrNoteNotFound, got %v", err)
 		}
@@ -331,13 +316,13 @@ func TestInMemoryStorageEdgeCases(t *testing.T) {
 			// CreatedAt and UpdatedAt are zero values
 		}
 
-		err := storage.Create(note)
+		err := storage.Create(context.Background(), note)
 		if err != nil {
 			t.Errorf("Failed to create note with nil fields: %v", err)
 		}
 
 		// Try to retrieve the note
-		retrieved, err := storage.Get("nil-fields")
+		retrieved, err := storage.Get(context.Background(), "nil-fields")
 		if err != nil {
 			t.Errorf("Failed to get note with nil fields: %v", err)
 		}
