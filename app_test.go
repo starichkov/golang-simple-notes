@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -497,6 +498,155 @@ func TestApp_ContextHandling(t *testing.T) {
 			// Clean up
 			if err := app.storage.Close(ctx); err != nil {
 				t.Errorf("Failed to close storage: %v", err)
+			}
+		})
+	}
+}
+
+func TestApp_SetupRESTServer(t *testing.T) {
+	config := &Config{
+		StorageType: "memory",
+		RESTPort:    ":8080",
+		GRPCPort:    ":8081",
+	}
+
+	app := NewApp(config)
+	app.storage = storage.NewInMemoryStorage()
+
+	server := app.setupRESTServer()
+	if server == nil {
+		t.Fatal("Expected server to be initialized")
+	}
+
+	if server.Addr != ":8080" {
+		t.Errorf("Expected server address to be ':8080', got %s", server.Addr)
+	}
+
+	if server.Handler == nil {
+		t.Error("Expected server handler to be initialized")
+	}
+}
+
+func TestApp_SetupGRPCServer(t *testing.T) {
+	testCases := []struct {
+		name     string
+		port     string
+		expected int
+	}{
+		{"default port", "", 8081},
+		{"valid port", ":9090", 9090},
+		{"invalid port", ":invalid", 8081}, // Should fall back to default
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := &Config{
+				StorageType: "memory",
+				RESTPort:    ":8080",
+				GRPCPort:    tc.port,
+			}
+
+			app := NewApp(config)
+			app.storage = storage.NewInMemoryStorage()
+
+			server := app.setupGRPCServer()
+			if server == nil {
+				t.Fatal("Expected server to be initialized")
+			}
+		})
+	}
+}
+
+func TestApp_StartServers(t *testing.T) {
+	config := &Config{
+		StorageType: "memory",
+		RESTPort:    ":0", // Use port 0 to avoid conflicts
+		GRPCPort:    ":0",
+	}
+
+	app := NewApp(config)
+	app.storage = storage.NewInMemoryStorage()
+	app.restServer = app.setupRESTServer()
+	app.grpcServer = app.setupGRPCServer()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	err := app.startServers(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start servers: %v", err)
+	}
+
+	// Give servers time to start
+	time.Sleep(10 * time.Millisecond)
+
+	// Clean up
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	app.restServer.Shutdown(shutdownCtx)
+	// gRPC server cleanup is handled by the context timeout
+}
+
+func TestApp_IsDuplicateKeyError(t *testing.T) {
+	testCases := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{"nil error", nil, false},
+		{"MongoDB duplicate key", fmt.Errorf("E11000 duplicate key error"), true},
+		{"CouchDB conflict", fmt.Errorf("conflict"), true},
+		{"CouchDB document update conflict", fmt.Errorf("Document update conflict"), true},
+		{"In-memory duplicate", fmt.Errorf("note already exists"), true},
+		{"Other error", fmt.Errorf("some other error"), false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isDuplicateKeyError(tc.err)
+			if result != tc.expected {
+				t.Errorf("Expected %v for error '%v', got %v", tc.expected, tc.err, result)
+			}
+		})
+	}
+}
+
+func TestApp_InitializeStorageError(t *testing.T) {
+	testCases := []struct {
+		name        string
+		storageType string
+		config      *Config
+	}{
+		{
+			name:        "invalid CouchDB URL",
+			storageType: "couchdb",
+			config: &Config{
+				StorageType: "couchdb",
+				CouchDBURL:  "invalid://url",
+				CouchDBName: "notes",
+			},
+		},
+		{
+			name:        "invalid MongoDB URI",
+			storageType: "mongodb",
+			config: &Config{
+				StorageType:       "mongodb",
+				MongoDBURI:        "invalid://uri",
+				MongoDBName:       "notes",
+				MongoDBCollection: "notes",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			app := NewApp(tc.config)
+			storage, err := app.initializeStorage(context.Background())
+			if err != nil {
+				t.Fatalf("Expected fallback to in-memory storage, got error: %v", err)
+			}
+			if storage == nil {
+				t.Fatal("Expected in-memory storage to be initialized")
 			}
 		})
 	}
