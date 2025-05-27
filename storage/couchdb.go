@@ -16,8 +16,6 @@ import (
 type CouchDBStorage struct {
 	client *kivik.Client
 	db     *kivik.DB
-	ctx    context.Context
-	cancel context.CancelFunc
 }
 
 // Document represents a CouchDB document with revision
@@ -30,100 +28,74 @@ type Document struct {
 	Updated time.Time `json:"updated_at"`
 }
 
-// NewCouchDBStorage creates a new instance of CouchDBStorage using Kivik
+// NewCouchDBStorage creates a new CouchDB storage instance
 func NewCouchDBStorage(url, dbName string) (*CouchDBStorage, error) {
-	// Create a context with timeout for database operations
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-
-	// Connect to CouchDB using Kivik
-	client, err := kivik.New("couch", url)
+	var client *kivik.Client
+	var err error
+	maxAttempts := 10
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		client, err = kivik.New("couch", url)
+		if err == nil {
+			// Try to get server version as a readiness check
+			if _, err = client.Version(context.Background()); err == nil {
+				break
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to connect to CouchDB: %w", err)
+		return nil, fmt.Errorf("failed to connect to CouchDB after retries: %w", err)
 	}
 
-	// Check if database exists
-	exists, err := client.DBExists(ctx, dbName)
+	// Create the database if it doesn't exist
+	exists, err := client.DBExists(context.Background(), dbName)
 	if err != nil {
-		cancel()
 		return nil, fmt.Errorf("failed to check if database exists: %w", err)
 	}
-
-	// Create database if it doesn't exist
 	if !exists {
-		if err := client.CreateDB(ctx, dbName); err != nil {
-			cancel()
+		if err := client.CreateDB(context.Background(), dbName); err != nil {
 			return nil, fmt.Errorf("failed to create database: %w", err)
 		}
 	}
 
-	// Get a reference to the database
 	db := client.DB(dbName)
+	if db.Err() != nil {
+		return nil, fmt.Errorf("failed to get database: %w", db.Err())
+	}
 
 	return &CouchDBStorage{
-		client: client,
-		db:     db,
-		ctx:    ctx,
-		cancel: cancel,
+		db: db,
 	}, nil
 }
 
-// Close closes any resources used by the storage
-func (s *CouchDBStorage) Close() error {
-	s.cancel()
-	return s.client.Close()
-}
-
-// Create adds a new note to the storage
-func (s *CouchDBStorage) Create(note *model.Note) error {
-	doc := Document{
-		ID:      note.ID,
-		Title:   note.Title,
-		Content: note.Content,
-		Created: note.CreatedAt,
-		Updated: note.UpdatedAt,
-	}
-
-	_, err := s.db.Put(s.ctx, note.ID, doc)
+// Create adds a new note to CouchDB
+func (s *CouchDBStorage) Create(ctx context.Context, note *model.Note) error {
+	_, err := s.db.Put(ctx, note.ID, note)
 	if err != nil {
 		return fmt.Errorf("failed to create note: %w", err)
 	}
-
 	return nil
 }
 
-// Get retrieves a note by its ID
-func (s *CouchDBStorage) Get(id string) (*model.Note, error) {
-	row := s.db.Get(s.ctx, id)
-	if err := row.Err(); err != nil {
-		// Check if the error is a "not found" error
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "Not Found") {
+// Get retrieves a note by its ID from CouchDB
+func (s *CouchDBStorage) Get(ctx context.Context, id string) (*model.Note, error) {
+	var note model.Note
+	err := s.db.Get(ctx, id).ScanDoc(&note)
+	if err != nil {
+		if err.Error() == "Not Found: missing" || err.Error() == "Not Found: deleted" {
 			return nil, ErrNoteNotFound
 		}
 		return nil, fmt.Errorf("failed to get note: %w", err)
 	}
-
-	var doc Document
-	if err := row.ScanDoc(&doc); err != nil {
-		return nil, fmt.Errorf("failed to decode document: %w", err)
-	}
-
-	note := &model.Note{
-		ID:        doc.ID,
-		Title:     doc.Title,
-		Content:   doc.Content,
-		CreatedAt: doc.Created,
-		UpdatedAt: doc.Updated,
-	}
-
-	return note, nil
+	return &note, nil
 }
 
-// GetAll retrieves all notes from the storage
-func (s *CouchDBStorage) GetAll() ([]*model.Note, error) {
-	// Use AllDocs to get all documents
-	rows := s.db.AllDocs(s.ctx)
-	defer rows.Close()
+// GetAll retrieves all notes from CouchDB
+func (s *CouchDBStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
+	rows := s.db.AllDocs(ctx, kivik.Param("include_docs", true))
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("failed to get all notes: %w", rows.Err())
+	}
 
 	var notes []*model.Note
 	for rows.Next() {
@@ -137,85 +109,80 @@ func (s *CouchDBStorage) GetAll() ([]*model.Note, error) {
 			continue
 		}
 
-		// Get the document by ID
-		note, err := s.Get(id)
-		if err != nil {
-			if err == ErrNoteNotFound {
-				continue // Skip deleted documents
-			}
-			return nil, fmt.Errorf("failed to get note: %w", err)
+		var note model.Note
+		if err := rows.ScanDoc(&note); err != nil {
+			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
-
-		notes = append(notes, note)
+		notes = append(notes, &note)
 	}
 
-	if rows.Err() != nil {
-		return nil, fmt.Errorf("error iterating through documents: %w", rows.Err())
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating notes: %w", err)
 	}
 
 	return notes, nil
 }
 
-// Update updates an existing note
-func (s *CouchDBStorage) Update(note *model.Note) error {
-	// Get the current document to get the _rev field
-	row := s.db.Get(s.ctx, note.ID)
-	if err := row.Err(); err != nil {
-		// Check if the error is a "not found" error
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "Not Found") {
+// Update updates an existing note in CouchDB
+func (s *CouchDBStorage) Update(ctx context.Context, note *model.Note) error {
+	row := s.db.Get(ctx, note.ID)
+	if row.Err() != nil {
+		if row.Err().Error() == "Not Found: missing" {
 			return ErrNoteNotFound
 		}
-		return fmt.Errorf("failed to get note: %w", err)
+		return fmt.Errorf("failed to get note for update: %w", row.Err())
 	}
 
-	var existingDoc Document
-	if err := row.ScanDoc(&existingDoc); err != nil {
-		return fmt.Errorf("failed to decode document: %w", err)
+	rev, err := row.Rev()
+	if err != nil {
+		return fmt.Errorf("failed to get revision for update: %w", err)
 	}
 
-	// Update the note with the current time
-	note.UpdatedAt = time.Now()
-
-	// Create a new document with the _rev field from the existing document
-	doc := Document{
-		ID:      note.ID,
-		Rev:     existingDoc.Rev,
-		Title:   note.Title,
-		Content: note.Content,
-		Created: note.CreatedAt,
-		Updated: note.UpdatedAt,
-	}
-
-	_, err := s.db.Put(s.ctx, note.ID, doc)
+	note.Rev = rev
+	_, err = s.db.Put(ctx, note.ID, note)
 	if err != nil {
 		return fmt.Errorf("failed to update note: %w", err)
+	}
+	return nil
+}
+
+// Delete removes a note from CouchDB
+func (s *CouchDBStorage) Delete(ctx context.Context, id string) error {
+	// First check if the document exists
+	row := s.db.Get(ctx, id)
+	if row.Err() != nil {
+		if row.Err().Error() == "Not Found: missing" || row.Err().Error() == "Not Found: deleted" {
+			return ErrNoteNotFound
+		}
+		return fmt.Errorf("failed to get note for deletion: %w", row.Err())
+	}
+
+	// Get the revision
+	rev, err := row.Rev()
+	if err != nil {
+		return fmt.Errorf("failed to get revision for deletion: %w", err)
+	}
+
+	// Delete the document
+	_, err = s.db.Delete(ctx, id, rev)
+	if err != nil {
+		return fmt.Errorf("failed to delete note: %w", err)
+	}
+
+	// Verify the document is deleted
+	row = s.db.Get(ctx, id)
+	if row.Err() == nil {
+		return fmt.Errorf("document still exists after deletion")
+	}
+	if row.Err().Error() != "Not Found: deleted" {
+		return fmt.Errorf("unexpected error after deletion: %w", row.Err())
 	}
 
 	return nil
 }
 
-// Delete removes a note from the storage
-func (s *CouchDBStorage) Delete(id string) error {
-	// Get the current document to get the _rev field
-	row := s.db.Get(s.ctx, id)
-	if err := row.Err(); err != nil {
-		// Check if the error is a "not found" error
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "Not Found") {
-			return ErrNoteNotFound
-		}
-		return fmt.Errorf("failed to get note: %w", err)
-	}
-
-	var existingDoc Document
-	if err := row.ScanDoc(&existingDoc); err != nil {
-		return fmt.Errorf("failed to decode document: %w", err)
-	}
-
-	// Delete the document
-	_, err := s.db.Delete(s.ctx, id, existingDoc.Rev)
-	if err != nil {
-		return fmt.Errorf("failed to delete note: %w", err)
-	}
-
+// Close closes the CouchDB connection
+func (s *CouchDBStorage) Close(context.Context) error {
+	// CouchDB client doesn't need explicit closing
 	return nil
 }

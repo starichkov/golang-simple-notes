@@ -8,6 +8,7 @@ import (
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -42,10 +43,18 @@ func TestMongoDBStorage(t *testing.T) {
 	}()
 
 	// Get connection details
-	mongodbEndpoint, err := mongodbContainer.ConnectionString(ctx)
+	host, err := mongodbContainer.Host(ctx)
 	if err != nil {
-		t.Fatalf("Failed to get MongoDB connection string: %v", err)
+		t.Fatalf("Failed to get MongoDB container host: %v", err)
 	}
+
+	port, err := mongodbContainer.MappedPort(ctx, "27017/tcp")
+	if err != nil {
+		t.Fatalf("Failed to get MongoDB container port: %v", err)
+	}
+
+	// Construct the MongoDB connection string
+	mongodbEndpoint := fmt.Sprintf("mongodb://admin:password@%s:%s", host, port.Port())
 
 	// Add database and collection names to the URI
 	dbName := "test_notes"
@@ -77,7 +86,7 @@ func TestMongoDBStorage(t *testing.T) {
 	}
 
 	// Run the fixed storage tests
-	testNoteStorage(t, storage)
+	testNoteStorage(t, storage, ctx)
 
 	// Clean up after the test
 	err = client.Database(dbName).Collection(collectionName).Drop(ctx)
@@ -92,7 +101,7 @@ func TestMongoDBStorageUnit(t *testing.T) {
 	storage := NewMockMongoDBStorage()
 
 	// Run the fixed storage tests
-	testNoteStorage(t, storage)
+	testNoteStorage(t, storage, context.Background())
 }
 
 // MockMongoDBStorage is a mock implementation of NoteStorage that behaves like MongoDB
@@ -108,7 +117,7 @@ func NewMockMongoDBStorage() *MockMongoDBStorage {
 }
 
 // Create adds a new note to the storage
-func (s *MockMongoDBStorage) Create(note *model.Note) error {
+func (s *MockMongoDBStorage) Create(ctx context.Context, note *model.Note) error {
 	// Check if note with the same ID already exists
 	if _, exists := s.notes[note.ID]; exists {
 		return fmt.Errorf("note with ID %s already exists", note.ID)
@@ -120,7 +129,7 @@ func (s *MockMongoDBStorage) Create(note *model.Note) error {
 }
 
 // Get retrieves a note by its ID
-func (s *MockMongoDBStorage) Get(id string) (*model.Note, error) {
+func (s *MockMongoDBStorage) Get(ctx context.Context, id string) (*model.Note, error) {
 	note, exists := s.notes[id]
 	if !exists {
 		return nil, ErrNoteNotFound
@@ -129,7 +138,7 @@ func (s *MockMongoDBStorage) Get(id string) (*model.Note, error) {
 }
 
 // GetAll retrieves all notes from the storage
-func (s *MockMongoDBStorage) GetAll() ([]*model.Note, error) {
+func (s *MockMongoDBStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
 	notes := make([]*model.Note, 0, len(s.notes))
 	for _, note := range s.notes {
 		notes = append(notes, note)
@@ -138,7 +147,7 @@ func (s *MockMongoDBStorage) GetAll() ([]*model.Note, error) {
 }
 
 // Update updates an existing note
-func (s *MockMongoDBStorage) Update(note *model.Note) error {
+func (s *MockMongoDBStorage) Update(ctx context.Context, note *model.Note) error {
 	if _, exists := s.notes[note.ID]; !exists {
 		return ErrNoteNotFound
 	}
@@ -152,7 +161,7 @@ func (s *MockMongoDBStorage) Update(note *model.Note) error {
 }
 
 // Delete removes a note from the storage
-func (s *MockMongoDBStorage) Delete(id string) error {
+func (s *MockMongoDBStorage) Delete(ctx context.Context, id string) error {
 	if _, exists := s.notes[id]; !exists {
 		return ErrNoteNotFound
 	}
@@ -162,7 +171,7 @@ func (s *MockMongoDBStorage) Delete(id string) error {
 }
 
 // Close closes any resources used by the storage
-func (s *MockMongoDBStorage) Close() error {
+func (s *MockMongoDBStorage) Close(ctx context.Context) error {
 	// Nothing to close for mock storage
 	return nil
 }
@@ -174,30 +183,52 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		t.Skip("Skipping MongoDB integration test in short mode")
 	}
 
-	ctx := context.Background()
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// Start MongoDB container
-	mongodbContainer, err := mongodb.Run(ctx,
-		"mongo:7.0.20-jammy",
-		mongodb.WithUsername("admin"),
-		mongodb.WithPassword("password"),
-	)
+	// Define the MongoDB container request
+	req := testcontainers.ContainerRequest{
+		Image:        "mongo:7.0.20-jammy",
+		ExposedPorts: []string{"27017/tcp"},
+		WaitingFor:   wait.ForLog("Waiting for connections"),
+		Env: map[string]string{
+			"MONGO_INITDB_ROOT_USERNAME": "admin",
+			"MONGO_INITDB_ROOT_PASSWORD": "password",
+		},
+	}
+
+	// Start the MongoDB container
+	mongoContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
 	if err != nil {
 		t.Fatalf("Failed to start MongoDB container: %v", err)
 	}
 
 	// Make sure to terminate the container at the end of the test
 	defer func() {
-		if err := testcontainers.TerminateContainer(mongodbContainer); err != nil {
+		termCtx, termCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer termCancel()
+		if err := mongoContainer.Terminate(termCtx); err != nil {
 			t.Logf("Failed to terminate MongoDB container: %v", err)
 		}
 	}()
 
 	// Get connection details
-	mongodbEndpoint, err := mongodbContainer.ConnectionString(ctx)
+	host, err := mongoContainer.Host(ctx)
 	if err != nil {
-		t.Fatalf("Failed to get MongoDB connection string: %v", err)
+		t.Fatalf("Failed to get MongoDB container host: %v", err)
 	}
+
+	port, err := mongoContainer.MappedPort(ctx, "27017/tcp")
+	if err != nil {
+		t.Fatalf("Failed to get MongoDB container port: %v", err)
+	}
+
+	// Construct the MongoDB connection string with authentication
+	mongodbEndpoint := fmt.Sprintf("mongodb://admin:password@%s:%s", host, port.Port())
 
 	// Add database and collection names to the URI
 	dbName := "test_notes"
@@ -227,14 +258,14 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create MongoDB storage: %v", err)
 	}
-	defer storage.Close()
+	defer storage.Close(ctx)
 
 	// Test that the unique index on ID works
 	t.Run("UniqueIDIndex", func(t *testing.T) {
 		note := model.NewNote("Test Title", "Test Content")
 
 		// Create the note
-		err := storage.Create(note)
+		err := storage.Create(ctx, note)
 		if err != nil {
 			t.Fatalf("Failed to create note: %v", err)
 		}
@@ -248,7 +279,7 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 			UpdatedAt: time.Now(),
 		}
 
-		err = storage.Create(duplicateNote)
+		err = storage.Create(ctx, duplicateNote)
 		if err == nil {
 			t.Error("Expected error when creating note with duplicate ID, got nil")
 		}
@@ -256,25 +287,23 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 
 	// Test error cases
 	t.Run("ErrorCases", func(t *testing.T) {
+		// Create a context with a shorter timeout for error cases
+		errorCtx, errorCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer errorCancel()
+
 		// Test Create error
 		t.Run("CreateError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
 			invalidURI := "mongodb://invalid:27017"
-			badStorage, err := NewMongoDBStorage(invalidURI, "test_db", "test_collection")
-			if err != nil {
-				// If NewMongoDBStorage fails, that's expected, but we need to test Create error
-				// So create a bad storage manually
-				badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
-				badStorage = &MongoDBStorage{
-					client:     badClient,
-					collection: badClient.Database("test_db").Collection("test_collection"),
-					ctx:        context.Background(),
-					cancel:     func() {},
-				}
+			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badStorage := &MongoDBStorage{
+				client:     badClient,
+				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
+			defer badStorage.Close(errorCtx)
 
 			note := model.NewNote("Error Note", "This should fail to create")
-			err = badStorage.Create(note)
+			err := badStorage.Create(errorCtx, note)
 			if err == nil {
 				t.Error("Expected error when creating note with bad storage, got nil")
 			}
@@ -284,20 +313,14 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		t.Run("GetError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
 			invalidURI := "mongodb://invalid:27017"
-			badStorage, err := NewMongoDBStorage(invalidURI, "test_db", "test_collection")
-			if err != nil {
-				// If NewMongoDBStorage fails, that's expected, but we need to test Get error
-				// So create a bad storage manually
-				badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
-				badStorage = &MongoDBStorage{
-					client:     badClient,
-					collection: badClient.Database("test_db").Collection("test_collection"),
-					ctx:        context.Background(),
-					cancel:     func() {},
-				}
+			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badStorage := &MongoDBStorage{
+				client:     badClient,
+				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
+			defer badStorage.Close(errorCtx)
 
-			_, err = badStorage.Get("some-id")
+			_, err := badStorage.Get(errorCtx, "some-id")
 			if err == nil {
 				t.Error("Expected error when getting note with bad storage, got nil")
 			}
@@ -307,20 +330,14 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		t.Run("GetAllError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
 			invalidURI := "mongodb://invalid:27017"
-			badStorage, err := NewMongoDBStorage(invalidURI, "test_db", "test_collection")
-			if err != nil {
-				// If NewMongoDBStorage fails, that's expected, but we need to test GetAll error
-				// So create a bad storage manually
-				badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
-				badStorage = &MongoDBStorage{
-					client:     badClient,
-					collection: badClient.Database("test_db").Collection("test_collection"),
-					ctx:        context.Background(),
-					cancel:     func() {},
-				}
+			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badStorage := &MongoDBStorage{
+				client:     badClient,
+				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
+			defer badStorage.Close(errorCtx)
 
-			_, err = badStorage.GetAll()
+			_, err := badStorage.GetAll(errorCtx)
 			if err == nil {
 				t.Error("Expected error when getting all notes with bad storage, got nil")
 			}
@@ -330,21 +347,15 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		t.Run("UpdateError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
 			invalidURI := "mongodb://invalid:27017"
-			badStorage, err := NewMongoDBStorage(invalidURI, "test_db", "test_collection")
-			if err != nil {
-				// If NewMongoDBStorage fails, that's expected, but we need to test Update error
-				// So create a bad storage manually
-				badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
-				badStorage = &MongoDBStorage{
-					client:     badClient,
-					collection: badClient.Database("test_db").Collection("test_collection"),
-					ctx:        context.Background(),
-					cancel:     func() {},
-				}
+			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badStorage := &MongoDBStorage{
+				client:     badClient,
+				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
+			defer badStorage.Close(errorCtx)
 
 			note := model.NewNote("Error Note", "This should fail to update")
-			err = badStorage.Update(note)
+			err := badStorage.Update(errorCtx, note)
 			if err == nil {
 				t.Error("Expected error when updating note with bad storage, got nil")
 			}
@@ -354,20 +365,14 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		t.Run("DeleteError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
 			invalidURI := "mongodb://invalid:27017"
-			badStorage, err := NewMongoDBStorage(invalidURI, "test_db", "test_collection")
-			if err != nil {
-				// If NewMongoDBStorage fails, that's expected, but we need to test Delete error
-				// So create a bad storage manually
-				badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
-				badStorage = &MongoDBStorage{
-					client:     badClient,
-					collection: badClient.Database("test_db").Collection("test_collection"),
-					ctx:        context.Background(),
-					cancel:     func() {},
-				}
+			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badStorage := &MongoDBStorage{
+				client:     badClient,
+				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
+			defer badStorage.Close(errorCtx)
 
-			err = badStorage.Delete("some-id")
+			err := badStorage.Delete(errorCtx, "some-id")
 			if err == nil {
 				t.Error("Expected error when deleting note with bad storage, got nil")
 			}

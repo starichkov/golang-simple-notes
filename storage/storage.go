@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -15,22 +16,22 @@ var (
 // NoteStorage defines the interface for note storage operations
 type NoteStorage interface {
 	// Create adds a new note to the storage
-	Create(note *model.Note) error
+	Create(ctx context.Context, note *model.Note) error
 
 	// Get retrieves a note by its ID
-	Get(id string) (*model.Note, error)
+	Get(ctx context.Context, id string) (*model.Note, error)
 
 	// GetAll retrieves all notes from the storage
-	GetAll() ([]*model.Note, error)
+	GetAll(ctx context.Context) ([]*model.Note, error)
 
 	// Update updates an existing note
-	Update(note *model.Note) error
+	Update(ctx context.Context, note *model.Note) error
 
 	// Delete removes a note from the storage
-	Delete(id string) error
+	Delete(ctx context.Context, id string) error
 
 	// Close closes any resources used by the storage
-	Close() error
+	Close(ctx context.Context) error
 }
 
 // InMemoryStorage implements NoteStorage using an in-memory map
@@ -47,7 +48,7 @@ func NewInMemoryStorage() *InMemoryStorage {
 }
 
 // Create adds a new note to the storage
-func (s *InMemoryStorage) Create(note *model.Note) error {
+func (s *InMemoryStorage) Create(ctx context.Context, note *model.Note) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -56,7 +57,7 @@ func (s *InMemoryStorage) Create(note *model.Note) error {
 }
 
 // Get retrieves a note by its ID
-func (s *InMemoryStorage) Get(id string) (*model.Note, error) {
+func (s *InMemoryStorage) Get(ctx context.Context, id string) (*model.Note, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -68,7 +69,7 @@ func (s *InMemoryStorage) Get(id string) (*model.Note, error) {
 }
 
 // GetAll retrieves all notes from the storage
-func (s *InMemoryStorage) GetAll() ([]*model.Note, error) {
+func (s *InMemoryStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -80,7 +81,7 @@ func (s *InMemoryStorage) GetAll() ([]*model.Note, error) {
 }
 
 // Update updates an existing note
-func (s *InMemoryStorage) Update(note *model.Note) error {
+func (s *InMemoryStorage) Update(ctx context.Context, note *model.Note) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -93,7 +94,7 @@ func (s *InMemoryStorage) Update(note *model.Note) error {
 }
 
 // Delete removes a note from the storage
-func (s *InMemoryStorage) Delete(id string) error {
+func (s *InMemoryStorage) Delete(ctx context.Context, id string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -106,7 +107,7 @@ func (s *InMemoryStorage) Delete(id string) error {
 }
 
 // Close closes any resources used by the storage
-func (s *InMemoryStorage) Close() error {
+func (s *InMemoryStorage) Close(ctx context.Context) error {
 	// Nothing to close for in-memory storage
 	return nil
 }

@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -50,17 +51,17 @@ func (s *Server) Start() error {
 // In a real implementation, these would have the correct signatures based on the generated protobuf code
 
 // CreateNote creates a new note
-func (s *Server) CreateNote(title, content string) (*model.Note, error) {
+func (s *Server) CreateNote(ctx context.Context, title, content string) (*model.Note, error) {
 	note := model.NewNote(title, content)
-	if err := s.storage.Create(note); err != nil {
+	if err := s.storage.Create(ctx, note); err != nil {
 		return nil, fmt.Errorf("failed to create note: %v", err)
 	}
 	return note, nil
 }
 
 // GetNote retrieves a note by ID
-func (s *Server) GetNote(id string) (*model.Note, error) {
-	note, err := s.storage.Get(id)
+func (s *Server) GetNote(ctx context.Context, id string) (*model.Note, error) {
+	note, err := s.storage.Get(ctx, id)
 	if err != nil {
 		if err == storage.ErrNoteNotFound {
 			return nil, fmt.Errorf("note not found")
@@ -71,8 +72,8 @@ func (s *Server) GetNote(id string) (*model.Note, error) {
 }
 
 // GetAllNotes retrieves all notes
-func (s *Server) GetAllNotes() ([]*model.Note, error) {
-	notes, err := s.storage.GetAll()
+func (s *Server) GetAllNotes(ctx context.Context) ([]*model.Note, error) {
+	notes, err := s.storage.GetAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve notes: %v", err)
 	}
@@ -80,8 +81,8 @@ func (s *Server) GetAllNotes() ([]*model.Note, error) {
 }
 
 // UpdateNote updates an existing note
-func (s *Server) UpdateNote(id, title, content string) (*model.Note, error) {
-	existingNote, err := s.storage.Get(id)
+func (s *Server) UpdateNote(ctx context.Context, id, title, content string) (*model.Note, error) {
+	existingNote, err := s.storage.Get(ctx, id)
 	if err != nil {
 		if err == storage.ErrNoteNotFound {
 			return nil, fmt.Errorf("note not found")
@@ -93,7 +94,7 @@ func (s *Server) UpdateNote(id, title, content string) (*model.Note, error) {
 	existingNote.Content = content
 	existingNote.UpdatedAt = time.Now()
 
-	if err := s.storage.Update(existingNote); err != nil {
+	if err := s.storage.Update(ctx, existingNote); err != nil {
 		return nil, fmt.Errorf("failed to update note: %v", err)
 	}
 
@@ -101,8 +102,8 @@ func (s *Server) UpdateNote(id, title, content string) (*model.Note, error) {
 }
 
 // DeleteNote deletes a note
-func (s *Server) DeleteNote(id string) error {
-	if err := s.storage.Delete(id); err != nil {
+func (s *Server) DeleteNote(ctx context.Context, id string) error {
+	if err := s.storage.Delete(ctx, id); err != nil {
 		if err == storage.ErrNoteNotFound {
 			return fmt.Errorf("note not found")
 		}

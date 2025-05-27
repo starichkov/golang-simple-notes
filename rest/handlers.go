@@ -3,156 +3,162 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
-	"time"
 
 	"golang-simple-notes/model"
 	"golang-simple-notes/storage"
+
+	"github.com/go-chi/chi/v5"
 )
 
-// Handler handles HTTP requests for the notes API
+// Handler handles HTTP requests for notes
 type Handler struct {
 	storage storage.NoteStorage
 }
 
-// NewHandler creates a new instance of Handler
+// NewHandler creates a new Handler instance
 func NewHandler(storage storage.NoteStorage) *Handler {
 	return &Handler{
 		storage: storage,
 	}
 }
 
-// RegisterRoutes registers all the routes for the REST API
+// RegisterRoutes registers the handler's routes
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/notes", h.GetAllNotes)
-	mux.HandleFunc("GET /api/notes/", h.GetNote)
-	mux.HandleFunc("POST /api/notes", h.CreateNote)
-	mux.HandleFunc("PUT /api/notes/", h.UpdateNote)
-	mux.HandleFunc("DELETE /api/notes/", h.DeleteNote)
+	mux.HandleFunc("/health", h.handleHealth)
+	mux.HandleFunc("/api/notes", h.handleNotes)
+	mux.HandleFunc("/api/notes/", h.handleNote)
 }
 
-// CreateNote handles the creation of a new note
-func (h *Handler) CreateNote(w http.ResponseWriter, r *http.Request) {
-	var noteRequest struct {
-		Title   string `json:"title"`
-		Content string `json:"content"`
+// handleHealth handles the health check endpoint
+func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
+
+// handleNotes handles requests for the /api/notes endpoint
+func (h *Handler) handleNotes(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.getAllNotes(w, r)
+	case http.MethodPost:
+		h.createNote(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleNote handles requests for the /api/notes/{id} endpoint
+func (h *Handler) handleNote(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Note ID is required", http.StatusBadRequest)
+		return
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&noteRequest); err != nil {
+	switch r.Method {
+	case http.MethodGet:
+		h.getNote(w, r, id)
+	case http.MethodPut:
+		h.updateNote(w, r, id)
+	case http.MethodDelete:
+		h.deleteNote(w, r, id)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// getAllNotes handles GET /api/notes
+func (h *Handler) getAllNotes(w http.ResponseWriter, r *http.Request) {
+	notes, err := h.storage.GetAll(r.Context())
+	if err != nil {
+		http.Error(w, "Failed to get notes", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(notes); err != nil {
+		http.Error(w, "Failed to encode notes", http.StatusInternalServerError)
+		return
+	}
+}
+
+// getNote handles GET /api/notes/{id}
+func (h *Handler) getNote(w http.ResponseWriter, r *http.Request, id string) {
+	note, err := h.storage.Get(r.Context(), id)
+	if err != nil {
+		if err == storage.ErrNoteNotFound {
+			http.Error(w, "Note not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to get note", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(note); err != nil {
+		http.Error(w, "Failed to encode note", http.StatusInternalServerError)
+		return
+	}
+}
+
+// createNote handles POST /api/notes
+func (h *Handler) createNote(w http.ResponseWriter, r *http.Request) {
+	var note model.Note
+	if err := json.NewDecoder(r.Body).Decode(&note); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if noteRequest.Title == "" {
-		http.Error(w, "Title is required", http.StatusBadRequest)
-		return
-	}
-
-	note := model.NewNote(noteRequest.Title, noteRequest.Content)
-	if err := h.storage.Create(note); err != nil {
+	if err := h.storage.Create(r.Context(), &note); err != nil {
 		http.Error(w, "Failed to create note", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(note)
+	if err := json.NewEncoder(w).Encode(note); err != nil {
+		http.Error(w, "Failed to encode note", http.StatusInternalServerError)
+		return
+	}
 }
 
-// GetAllNotes handles retrieving all notes
-func (h *Handler) GetAllNotes(w http.ResponseWriter, r *http.Request) {
-	notes, err := h.storage.GetAll()
-	if err != nil {
-		http.Error(w, "Failed to retrieve notes", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(notes)
-}
-
-// GetNote handles retrieving a single note by ID
-func (h *Handler) GetNote(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/api/notes/")
-	if id == "" {
-		http.Error(w, "Note ID is required", http.StatusBadRequest)
-		return
-	}
-
-	note, err := h.storage.Get(id)
-	if err != nil {
-		if err == storage.ErrNoteNotFound {
-			http.Error(w, "Note not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to retrieve note", http.StatusInternalServerError)
-		}
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(note)
-}
-
-// UpdateNote handles updating an existing note
-func (h *Handler) UpdateNote(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/api/notes/")
-	if id == "" {
-		http.Error(w, "Note ID is required", http.StatusBadRequest)
-		return
-	}
-
-	existingNote, err := h.storage.Get(id)
-	if err != nil {
-		if err == storage.ErrNoteNotFound {
-			http.Error(w, "Note not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to retrieve note", http.StatusInternalServerError)
-		}
-		return
-	}
-
-	var noteRequest struct {
-		Title   string `json:"title"`
-		Content string `json:"content"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&noteRequest); err != nil {
+// updateNote handles PUT /api/notes/{id}
+func (h *Handler) updateNote(w http.ResponseWriter, r *http.Request, id string) {
+	var note model.Note
+	if err := json.NewDecoder(r.Body).Decode(&note); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if noteRequest.Title == "" {
-		http.Error(w, "Title is required", http.StatusBadRequest)
-		return
-	}
-
-	existingNote.Title = noteRequest.Title
-	existingNote.Content = noteRequest.Content
-	existingNote.UpdatedAt = time.Now()
-
-	if err := h.storage.Update(existingNote); err != nil {
+	note.ID = id
+	if err := h.storage.Update(r.Context(), &note); err != nil {
+		if err == storage.ErrNoteNotFound {
+			http.Error(w, "Note not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, "Failed to update note", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(existingNote)
-}
-
-// DeleteNote handles deleting a note
-func (h *Handler) DeleteNote(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/api/notes/")
-	if id == "" {
-		http.Error(w, "Note ID is required", http.StatusBadRequest)
+	if err := json.NewEncoder(w).Encode(note); err != nil {
+		http.Error(w, "Failed to encode note", http.StatusInternalServerError)
 		return
 	}
+}
 
-	if err := h.storage.Delete(id); err != nil {
+// deleteNote handles DELETE /api/notes/{id}
+func (h *Handler) deleteNote(w http.ResponseWriter, r *http.Request, id string) {
+	if err := h.storage.Delete(r.Context(), id); err != nil {
 		if err == storage.ErrNoteNotFound {
 			http.Error(w, "Note not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to delete note", http.StatusInternalServerError)
+			return
 		}
+		http.Error(w, "Failed to delete note", http.StatusInternalServerError)
 		return
 	}
 

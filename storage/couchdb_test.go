@@ -22,7 +22,9 @@ func TestCouchDBStorage(t *testing.T) {
 		t.Skip("Skipping CouchDB integration test in short mode")
 	}
 
-	ctx := context.Background()
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	// Define the CouchDB container request
 	req := testcontainers.ContainerRequest{
@@ -46,7 +48,9 @@ func TestCouchDBStorage(t *testing.T) {
 
 	// Make sure to terminate the container at the end of the test
 	defer func() {
-		if err := couchdbContainer.Terminate(ctx); err != nil {
+		termCtx, termCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer termCancel()
+		if err := couchdbContainer.Terminate(termCtx); err != nil {
 			t.Logf("Failed to terminate CouchDB container: %v", err)
 		}
 	}()
@@ -71,6 +75,7 @@ func TestCouchDBStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to CouchDB container: %v", err)
 	}
+	defer client.Close()
 
 	// Check if the server is available
 	_, err = client.AllDBs(ctx)
@@ -85,6 +90,11 @@ func TestCouchDBStorage(t *testing.T) {
 		}
 	}
 
+	// Create the database
+	if err := client.CreateDB(ctx, dbName); err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+
 	// Create a new CouchDB storage
 	storage, err := NewCouchDBStorage(url, dbName)
 	if err != nil {
@@ -92,7 +102,7 @@ func TestCouchDBStorage(t *testing.T) {
 	}
 
 	// Run the fixed storage tests
-	testNoteStorage(t, storage)
+	testNoteStorage(t, storage, ctx)
 
 	// Clean up after the test
 	if err := client.DestroyDB(ctx, dbName); err != nil {
@@ -106,7 +116,7 @@ func TestCouchDBStorageUnit(t *testing.T) {
 	storage := NewMockCouchDBStorage()
 
 	// Run the fixed storage tests
-	testNoteStorage(t, storage)
+	testNoteStorage(t, storage, context.Background())
 }
 
 // MockCouchDBStorage is a mock implementation of NoteStorage that behaves like CouchDB
@@ -122,7 +132,7 @@ func NewMockCouchDBStorage() *MockCouchDBStorage {
 }
 
 // Create adds a new note to the storage
-func (s *MockCouchDBStorage) Create(note *model.Note) error {
+func (s *MockCouchDBStorage) Create(_ context.Context, note *model.Note) error {
 	// Check if note with the same ID already exists
 	if _, exists := s.notes[note.ID]; exists {
 		return fmt.Errorf("note with ID %s already exists", note.ID)
@@ -134,7 +144,7 @@ func (s *MockCouchDBStorage) Create(note *model.Note) error {
 }
 
 // Get retrieves a note by its ID
-func (s *MockCouchDBStorage) Get(id string) (*model.Note, error) {
+func (s *MockCouchDBStorage) Get(_ context.Context, id string) (*model.Note, error) {
 	note, exists := s.notes[id]
 	if !exists {
 		return nil, ErrNoteNotFound
@@ -143,7 +153,7 @@ func (s *MockCouchDBStorage) Get(id string) (*model.Note, error) {
 }
 
 // GetAll retrieves all notes from the storage
-func (s *MockCouchDBStorage) GetAll() ([]*model.Note, error) {
+func (s *MockCouchDBStorage) GetAll(_ context.Context) ([]*model.Note, error) {
 	notes := make([]*model.Note, 0, len(s.notes))
 	for _, note := range s.notes {
 		// Skip design documents (in CouchDB, these have IDs starting with "_design/")
@@ -156,7 +166,7 @@ func (s *MockCouchDBStorage) GetAll() ([]*model.Note, error) {
 }
 
 // Update updates an existing note
-func (s *MockCouchDBStorage) Update(note *model.Note) error {
+func (s *MockCouchDBStorage) Update(_ context.Context, note *model.Note) error {
 	if _, exists := s.notes[note.ID]; !exists {
 		return ErrNoteNotFound
 	}
@@ -170,7 +180,7 @@ func (s *MockCouchDBStorage) Update(note *model.Note) error {
 }
 
 // Delete removes a note from the storage
-func (s *MockCouchDBStorage) Delete(id string) error {
+func (s *MockCouchDBStorage) Delete(_ context.Context, id string) error {
 	if _, exists := s.notes[id]; !exists {
 		return ErrNoteNotFound
 	}
@@ -180,7 +190,7 @@ func (s *MockCouchDBStorage) Delete(id string) error {
 }
 
 // Close closes any resources used by the storage
-func (s *MockCouchDBStorage) Close() error {
+func (s *MockCouchDBStorage) Close(_ context.Context) error {
 	// Nothing to close for mock storage
 	return nil
 }
@@ -192,7 +202,9 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 		t.Skip("Skipping CouchDB integration test in short mode")
 	}
 
-	ctx := context.Background()
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	// Define the CouchDB container request
 	req := testcontainers.ContainerRequest{
@@ -216,7 +228,9 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 
 	// Make sure to terminate the container at the end of the test
 	defer func() {
-		if err := couchdbContainer.Terminate(ctx); err != nil {
+		termCtx, termCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer termCancel()
+		if err := couchdbContainer.Terminate(termCtx); err != nil {
 			t.Logf("Failed to terminate CouchDB container: %v", err)
 		}
 	}()
@@ -241,6 +255,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to CouchDB container: %v", err)
 	}
+	defer client.Close()
 
 	// Check if the server is available
 	_, err = client.AllDBs(ctx)
@@ -255,32 +270,37 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 		}
 	}
 
+	// Create the database
+	if err := client.CreateDB(ctx, dbName); err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+
 	// Create a new CouchDB storage
 	storage, err := NewCouchDBStorage(url, dbName)
 	if err != nil {
 		t.Fatalf("Failed to create CouchDB storage: %v", err)
 	}
-	defer storage.Close()
+	defer storage.Close(ctx)
 
 	// Test document revision handling
 	t.Run("DocumentRevision", func(t *testing.T) {
 		note := model.NewNote("Test Title", "Test Content")
 
 		// Create the note
-		err := storage.Create(note)
+		err := storage.Create(ctx, note)
 		if err != nil {
 			t.Fatalf("Failed to create note: %v", err)
 		}
 
 		// Update the note
 		note.Title = "Updated Title"
-		err = storage.Update(note)
+		err = storage.Update(ctx, note)
 		if err != nil {
 			t.Fatalf("Failed to update note: %v", err)
 		}
 
 		// Get the note to verify the update
-		retrieved, err := storage.Get(note.ID)
+		retrieved, err := storage.Get(ctx, note.ID)
 		if err != nil {
 			t.Fatalf("Failed to get note: %v", err)
 		}
@@ -309,7 +329,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create CouchDB storage: %v", err)
 		}
-		defer storage.Close()
+		defer storage.Close(ctx)
 
 		// Create a design document directly using the CouchDB client
 		designDoc := map[string]interface{}{
@@ -329,7 +349,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 
 		// Create a regular note
 		note := model.NewNote("Regular Note", "This is a regular note")
-		err = storage.Create(note)
+		err = storage.Create(ctx, note)
 		if err != nil {
 			t.Fatalf("Failed to create note: %v", err)
 		}
@@ -348,7 +368,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 		}
 
 		// Get all notes
-		notes, err := storage.GetAll()
+		notes, err := storage.GetAll(ctx)
 		if err != nil {
 			t.Fatalf("Failed to get all notes: %v", err)
 		}
@@ -377,12 +397,11 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 			badStorage := &CouchDBStorage{
 				client: client,
 				db:     client.DB("non_existent_db"), // Use a non-existent database
-				ctx:    ctx,
-				cancel: func() {},
 			}
+			defer badStorage.Close(ctx)
 
 			note := model.NewNote("Error Note", "This should fail to create")
-			err := badStorage.Create(note)
+			err := badStorage.Create(ctx, note)
 			if err == nil {
 				t.Error("Expected error when creating note with bad storage, got nil")
 			}
@@ -393,15 +412,15 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 			// Create a storage with a closed context to simulate an error
 			canceledCtx, cancel := context.WithCancel(context.Background())
 			cancel() // Cancel the context immediately
+			defer cancel()
 
 			badStorage := &CouchDBStorage{
 				client: client,
 				db:     client.DB(dbName),
-				ctx:    canceledCtx, // Use canceled context
-				cancel: func() {},
 			}
+			defer badStorage.Close(ctx)
 
-			_, err := badStorage.Get("some-id")
+			_, err := badStorage.Get(canceledCtx, "some-id")
 			if err == nil {
 				t.Error("Expected error when getting note with canceled context, got nil")
 			}
@@ -412,15 +431,15 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 			// Create a storage with a closed context to simulate an error
 			canceledCtx, cancel := context.WithCancel(context.Background())
 			cancel() // Cancel the context immediately
+			defer cancel()
 
 			badStorage := &CouchDBStorage{
 				client: client,
 				db:     client.DB(dbName),
-				ctx:    canceledCtx, // Use canceled context
-				cancel: func() {},
 			}
+			defer badStorage.Close(ctx)
 
-			_, err := badStorage.GetAll()
+			_, err := badStorage.GetAll(canceledCtx)
 			if err == nil {
 				t.Error("Expected error when getting all notes with canceled context, got nil")
 			}
@@ -431,16 +450,16 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 			// Create a storage with a closed context to simulate an error
 			canceledCtx, cancel := context.WithCancel(context.Background())
 			cancel() // Cancel the context immediately
+			defer cancel()
 
 			badStorage := &CouchDBStorage{
 				client: client,
 				db:     client.DB(dbName),
-				ctx:    canceledCtx, // Use canceled context
-				cancel: func() {},
 			}
+			defer badStorage.Close(ctx)
 
 			note := model.NewNote("Error Note", "This should fail to update")
-			err := badStorage.Update(note)
+			err := badStorage.Update(canceledCtx, note)
 			if err == nil {
 				t.Error("Expected error when updating note with canceled context, got nil")
 			}
@@ -451,15 +470,15 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 			// Create a storage with a closed context to simulate an error
 			canceledCtx, cancel := context.WithCancel(context.Background())
 			cancel() // Cancel the context immediately
+			defer cancel()
 
 			badStorage := &CouchDBStorage{
 				client: client,
 				db:     client.DB(dbName),
-				ctx:    canceledCtx, // Use canceled context
-				cancel: func() {},
 			}
+			defer badStorage.Close(ctx)
 
-			err := badStorage.Delete("some-id")
+			err := badStorage.Delete(canceledCtx, "some-id")
 			if err == nil {
 				t.Error("Expected error when deleting note with canceled context, got nil")
 			}

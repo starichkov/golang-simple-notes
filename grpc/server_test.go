@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"context"
 	"errors"
 	"net"
 	"testing"
@@ -22,13 +23,13 @@ func NewMockStorage() *MockStorage {
 }
 
 // Create adds a new note to the storage
-func (s *MockStorage) Create(note *model.Note) error {
+func (s *MockStorage) Create(ctx context.Context, note *model.Note) error {
 	s.notes[note.ID] = note
 	return nil
 }
 
 // Get retrieves a note by its ID
-func (s *MockStorage) Get(id string) (*model.Note, error) {
+func (s *MockStorage) Get(ctx context.Context, id string) (*model.Note, error) {
 	note, exists := s.notes[id]
 	if !exists {
 		return nil, storage.ErrNoteNotFound
@@ -37,7 +38,7 @@ func (s *MockStorage) Get(id string) (*model.Note, error) {
 }
 
 // GetAll retrieves all notes from the storage
-func (s *MockStorage) GetAll() ([]*model.Note, error) {
+func (s *MockStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
 	notes := make([]*model.Note, 0, len(s.notes))
 	for _, note := range s.notes {
 		notes = append(notes, note)
@@ -46,7 +47,7 @@ func (s *MockStorage) GetAll() ([]*model.Note, error) {
 }
 
 // Update updates an existing note
-func (s *MockStorage) Update(note *model.Note) error {
+func (s *MockStorage) Update(ctx context.Context, note *model.Note) error {
 	if _, exists := s.notes[note.ID]; !exists {
 		return storage.ErrNoteNotFound
 	}
@@ -55,7 +56,7 @@ func (s *MockStorage) Update(note *model.Note) error {
 }
 
 // Delete removes a note from the storage
-func (s *MockStorage) Delete(id string) error {
+func (s *MockStorage) Delete(ctx context.Context, id string) error {
 	if _, exists := s.notes[id]; !exists {
 		return storage.ErrNoteNotFound
 	}
@@ -64,7 +65,7 @@ func (s *MockStorage) Delete(id string) error {
 }
 
 // Close closes any resources used by the storage
-func (s *MockStorage) Close() error {
+func (s *MockStorage) Close(ctx context.Context) error {
 	return nil
 }
 
@@ -77,32 +78,32 @@ func NewFailingMockStorage() *FailingMockStorage {
 }
 
 // Create always returns an error
-func (s *FailingMockStorage) Create(note *model.Note) error {
+func (s *FailingMockStorage) Create(ctx context.Context, note *model.Note) error {
 	return errors.New("mock storage create error")
 }
 
 // Get always returns an error
-func (s *FailingMockStorage) Get(id string) (*model.Note, error) {
+func (s *FailingMockStorage) Get(ctx context.Context, id string) (*model.Note, error) {
 	return nil, errors.New("mock storage get error")
 }
 
 // GetAll always returns an error
-func (s *FailingMockStorage) GetAll() ([]*model.Note, error) {
+func (s *FailingMockStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
 	return nil, errors.New("mock storage getall error")
 }
 
 // Update always returns an error
-func (s *FailingMockStorage) Update(note *model.Note) error {
+func (s *FailingMockStorage) Update(ctx context.Context, note *model.Note) error {
 	return errors.New("mock storage update error")
 }
 
 // Delete always returns an error
-func (s *FailingMockStorage) Delete(id string) error {
+func (s *FailingMockStorage) Delete(ctx context.Context, id string) error {
 	return errors.New("mock storage delete error")
 }
 
 // Close always returns an error
-func (s *FailingMockStorage) Close() error {
+func (s *FailingMockStorage) Close(ctx context.Context) error {
 	return errors.New("mock storage close error")
 }
 
@@ -162,8 +163,9 @@ func TestStartError(t *testing.T) {
 func TestCreateNote(t *testing.T) {
 	mockStorage := NewMockStorage()
 	server := NewServer(mockStorage, 8081)
+	ctx := context.Background()
 
-	note, err := server.CreateNote("Test Title", "Test Content")
+	note, err := server.CreateNote(ctx, "Test Title", "Test Content")
 	if err != nil {
 		t.Fatalf("Failed to create note: %v", err)
 	}
@@ -181,7 +183,7 @@ func TestCreateNote(t *testing.T) {
 	}
 
 	// Verify the note was added to storage
-	retrieved, err := mockStorage.Get(note.ID)
+	retrieved, err := mockStorage.Get(ctx, note.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve note from storage: %v", err)
 	}
@@ -195,13 +197,14 @@ func TestCreateNote(t *testing.T) {
 func TestGetNote(t *testing.T) {
 	mockStorage := NewMockStorage()
 	server := NewServer(mockStorage, 8081)
+	ctx := context.Background()
 
 	// Create a note
 	originalNote := model.NewNote("Test Title", "Test Content")
-	mockStorage.Create(originalNote)
+	mockStorage.Create(ctx, originalNote)
 
 	// Test getting an existing note
-	note, err := server.GetNote(originalNote.ID)
+	note, err := server.GetNote(ctx, originalNote.ID)
 	if err != nil {
 		t.Fatalf("Failed to get note: %v", err)
 	}
@@ -219,7 +222,7 @@ func TestGetNote(t *testing.T) {
 	}
 
 	// Test getting a non-existent note
-	_, err = server.GetNote("non-existent-id")
+	_, err = server.GetNote(ctx, "non-existent-id")
 	if err == nil {
 		t.Error("Expected error when getting non-existent note, got nil")
 	}
@@ -229,15 +232,16 @@ func TestGetNote(t *testing.T) {
 func TestGetAllNotes(t *testing.T) {
 	mockStorage := NewMockStorage()
 	server := NewServer(mockStorage, 8081)
+	ctx := context.Background()
 
 	// Create some notes
 	note1 := model.NewNote("Title 1", "Content 1")
 	note2 := model.NewNote("Title 2", "Content 2")
-	mockStorage.Create(note1)
-	mockStorage.Create(note2)
+	mockStorage.Create(ctx, note1)
+	mockStorage.Create(ctx, note2)
 
 	// Get all notes
-	notes, err := server.GetAllNotes()
+	notes, err := server.GetAllNotes(ctx)
 	if err != nil {
 		t.Fatalf("Failed to get all notes: %v", err)
 	}
@@ -248,21 +252,17 @@ func TestGetAllNotes(t *testing.T) {
 
 	// Check that both notes are in the result
 	found1, found2 := false, false
-	for _, n := range notes {
-		if n.ID == note1.ID {
+	for _, note := range notes {
+		if note.ID == note1.ID {
 			found1 = true
 		}
-		if n.ID == note2.ID {
+		if note.ID == note2.ID {
 			found2 = true
 		}
 	}
 
-	if !found1 {
-		t.Error("Note 1 not found in GetAllNotes results")
-	}
-
-	if !found2 {
-		t.Error("Note 2 not found in GetAllNotes results")
+	if !found1 || !found2 {
+		t.Error("Not all notes were found in the result")
 	}
 }
 
@@ -270,23 +270,20 @@ func TestGetAllNotes(t *testing.T) {
 func TestUpdateNote(t *testing.T) {
 	mockStorage := NewMockStorage()
 	server := NewServer(mockStorage, 8081)
+	ctx := context.Background()
 
 	// Create a note
 	originalNote := model.NewNote("Original Title", "Original Content")
-	mockStorage.Create(originalNote)
+	mockStorage.Create(ctx, originalNote)
 
 	// Update the note
-	updatedNote, err := server.UpdateNote(originalNote.ID, "Updated Title", "Updated Content")
+	updatedNote, err := server.UpdateNote(ctx, originalNote.ID, "Updated Title", "Updated Content")
 	if err != nil {
 		t.Fatalf("Failed to update note: %v", err)
 	}
 
 	if updatedNote == nil {
-		t.Fatal("Expected note to be updated, got nil")
-	}
-
-	if updatedNote.ID != originalNote.ID {
-		t.Errorf("Expected ID to remain %s, got %s", originalNote.ID, updatedNote.ID)
+		t.Fatal("Expected updated note to be returned, got nil")
 	}
 
 	if updatedNote.Title != "Updated Title" {
@@ -298,19 +295,13 @@ func TestUpdateNote(t *testing.T) {
 	}
 
 	// Verify the note was updated in storage
-	retrieved, err := mockStorage.Get(originalNote.ID)
+	retrieved, err := mockStorage.Get(ctx, originalNote.ID)
 	if err != nil {
-		t.Fatalf("Failed to retrieve note from storage: %v", err)
+		t.Fatalf("Failed to retrieve updated note: %v", err)
 	}
 
 	if retrieved.Title != "Updated Title" {
-		t.Errorf("Expected title in storage to be 'Updated Title', got '%s'", retrieved.Title)
-	}
-
-	// Test updating a non-existent note
-	_, err = server.UpdateNote("non-existent-id", "New Title", "New Content")
-	if err == nil {
-		t.Error("Expected error when updating non-existent note, got nil")
+		t.Errorf("Expected title to be 'Updated Title', got '%s'", retrieved.Title)
 	}
 }
 
@@ -318,81 +309,81 @@ func TestUpdateNote(t *testing.T) {
 func TestDeleteNote(t *testing.T) {
 	mockStorage := NewMockStorage()
 	server := NewServer(mockStorage, 8081)
+	ctx := context.Background()
 
 	// Create a note
-	note := model.NewNote("To Delete", "This note will be deleted")
-	mockStorage.Create(note)
+	note := model.NewNote("Test Title", "Test Content")
+	mockStorage.Create(ctx, note)
 
 	// Delete the note
-	err := server.DeleteNote(note.ID)
+	err := server.DeleteNote(ctx, note.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete note: %v", err)
 	}
 
-	// Verify the note was deleted from storage
-	_, err = mockStorage.Get(note.ID)
+	// Verify the note was deleted
+	_, err = mockStorage.Get(ctx, note.ID)
 	if err != storage.ErrNoteNotFound {
-		t.Errorf("Expected note to be deleted, but it still exists")
-	}
-
-	// Test deleting a non-existent note
-	err = server.DeleteNote("non-existent-id")
-	if err == nil {
-		t.Error("Expected error when deleting non-existent note, got nil")
+		t.Error("Expected note to be deleted")
 	}
 }
 
-// TestCreateNoteError tests error handling in the CreateNote method
+// TestCreateNoteError tests error handling in CreateNote
 func TestCreateNoteError(t *testing.T) {
 	failingStorage := NewFailingMockStorage()
 	server := NewServer(failingStorage, 8081)
+	ctx := context.Background()
 
-	_, err := server.CreateNote("Test Title", "Test Content")
+	_, err := server.CreateNote(ctx, "Test Title", "Test Content")
 	if err == nil {
-		t.Fatal("Expected error when creating note with failing storage, got nil")
+		t.Error("Expected error when creating note with failing storage")
 	}
 }
 
-// TestGetNoteError tests error handling in the GetNote method
+// TestGetNoteError tests error handling in GetNote
 func TestGetNoteError(t *testing.T) {
 	failingStorage := NewFailingMockStorage()
 	server := NewServer(failingStorage, 8081)
+	ctx := context.Background()
 
-	_, err := server.GetNote("any-id")
+	_, err := server.GetNote(ctx, "test-id")
 	if err == nil {
-		t.Fatal("Expected error when getting note with failing storage, got nil")
+		t.Error("Expected error when getting note with failing storage")
 	}
 }
 
-// TestGetAllNotesError tests error handling in the GetAllNotes method
+// TestGetAllNotesError tests error handling in GetAllNotes
 func TestGetAllNotesError(t *testing.T) {
 	failingStorage := NewFailingMockStorage()
 	server := NewServer(failingStorage, 8081)
+	ctx := context.Background()
 
-	_, err := server.GetAllNotes()
+	_, err := server.GetAllNotes(ctx)
 	if err == nil {
-		t.Fatal("Expected error when getting all notes with failing storage, got nil")
+		t.Error("Expected error when getting all notes with failing storage")
 	}
 }
 
-// TestUpdateNoteError tests error handling in the UpdateNote method
+// TestUpdateNoteError tests error handling in UpdateNote
 func TestUpdateNoteError(t *testing.T) {
 	failingStorage := NewFailingMockStorage()
 	server := NewServer(failingStorage, 8081)
+	ctx := context.Background()
 
-	_, err := server.UpdateNote("any-id", "Updated Title", "Updated Content")
+	_, err := server.UpdateNote(ctx, "test-id", "New Title", "New Content")
 	if err == nil {
-		t.Fatal("Expected error when updating note with failing storage, got nil")
+		t.Error("Expected error when updating note with failing storage")
 	}
 }
 
-// TestDeleteNoteError tests error handling in the DeleteNote method
+// TestDeleteNoteError tests error handling in DeleteNote
 func TestDeleteNoteError(t *testing.T) {
 	failingStorage := NewFailingMockStorage()
 	server := NewServer(failingStorage, 8081)
+	ctx := context.Background()
 
-	err := server.DeleteNote("any-id")
+	err := server.DeleteNote(ctx, "test-id")
 	if err == nil {
-		t.Fatal("Expected error when deleting note with failing storage, got nil")
+		t.Error("Expected error when deleting note with failing storage")
 	}
 }

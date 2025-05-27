@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,20 +9,20 @@ import (
 )
 
 // testNoteStorage is a helper function that tests any implementation of NoteStorage
-func testNoteStorage(t *testing.T, storage NoteStorage) {
+func testNoteStorage(t *testing.T, storage NoteStorage, ctx context.Context) {
 	// Test Create and Get
 	t.Run("Create and Get", func(t *testing.T) {
 		// Clean up any existing notes
-		cleanupStorage(t, storage)
+		cleanupStorage(t, storage, ctx)
 
 		note := model.NewNote("Test Title", "Test Content")
 
-		err := storage.Create(note)
+		err := storage.Create(ctx, note)
 		if err != nil {
 			t.Fatalf("Failed to create note: %v", err)
 		}
 
-		retrieved, err := storage.Get(note.ID)
+		retrieved, err := storage.Get(ctx, note.ID)
 		if err != nil {
 			t.Fatalf("Failed to get note: %v", err)
 		}
@@ -42,23 +43,23 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 	// Test GetAll
 	t.Run("GetAll", func(t *testing.T) {
 		// Clean up any existing notes
-		cleanupStorage(t, storage)
+		cleanupStorage(t, storage, ctx)
 
 		// Create some notes
 		note1 := model.NewNote("Title 1", "Content 1")
 		note2 := model.NewNote("Title 2", "Content 2")
 
-		err := storage.Create(note1)
+		err := storage.Create(ctx, note1)
 		if err != nil {
 			t.Fatalf("Failed to create note1: %v", err)
 		}
 
-		err = storage.Create(note2)
+		err = storage.Create(ctx, note2)
 		if err != nil {
 			t.Fatalf("Failed to create note2: %v", err)
 		}
 
-		notes, err := storage.GetAll()
+		notes, err := storage.GetAll(ctx)
 		if err != nil {
 			t.Fatalf("Failed to get all notes: %v", err)
 		}
@@ -90,11 +91,11 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 	// Test Update
 	t.Run("Update", func(t *testing.T) {
 		// Clean up any existing notes
-		cleanupStorage(t, storage)
+		cleanupStorage(t, storage, ctx)
 
 		note := model.NewNote("Original Title", "Original Content")
 
-		err := storage.Create(note)
+		err := storage.Create(ctx, note)
 		if err != nil {
 			t.Fatalf("Failed to create note: %v", err)
 		}
@@ -104,13 +105,13 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 		note.Content = "Updated Content"
 		note.UpdatedAt = time.Now()
 
-		err = storage.Update(note)
+		err = storage.Update(ctx, note)
 		if err != nil {
 			t.Fatalf("Failed to update note: %v", err)
 		}
 
 		// Retrieve the updated note
-		retrieved, err := storage.Get(note.ID)
+		retrieved, err := storage.Get(ctx, note.ID)
 		if err != nil {
 			t.Fatalf("Failed to get updated note: %v", err)
 		}
@@ -128,7 +129,7 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 	t.Run("Update Non-existent", func(t *testing.T) {
 		note := model.NewNote("Non-existent", "This note doesn't exist in storage")
 
-		err := storage.Update(note)
+		err := storage.Update(ctx, note)
 		if err != ErrNoteNotFound {
 			t.Errorf("Expected ErrNoteNotFound, got %v", err)
 		}
@@ -137,23 +138,23 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 	// Test Delete
 	t.Run("Delete", func(t *testing.T) {
 		// Clean up any existing notes
-		cleanupStorage(t, storage)
+		cleanupStorage(t, storage, ctx)
 
 		note := model.NewNote("To Delete", "This note will be deleted")
 
-		err := storage.Create(note)
+		err := storage.Create(ctx, note)
 		if err != nil {
 			t.Fatalf("Failed to create note: %v", err)
 		}
 
 		// Delete the note
-		err = storage.Delete(note.ID)
+		err = storage.Delete(ctx, note.ID)
 		if err != nil {
 			t.Fatalf("Failed to delete note: %v", err)
 		}
 
 		// Try to retrieve the deleted note
-		_, err = storage.Get(note.ID)
+		_, err = storage.Get(ctx, note.ID)
 		if err != ErrNoteNotFound {
 			t.Errorf("Expected ErrNoteNotFound, got %v", err)
 		}
@@ -161,7 +162,7 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 
 	// Test Delete with non-existent note
 	t.Run("Delete Non-existent", func(t *testing.T) {
-		err := storage.Delete("non-existent-id")
+		err := storage.Delete(ctx, "non-existent-id")
 		if err != ErrNoteNotFound {
 			t.Errorf("Expected ErrNoteNotFound, got %v", err)
 		}
@@ -169,7 +170,7 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 
 	// Test Close
 	t.Run("Close", func(t *testing.T) {
-		err := storage.Close()
+		err := storage.Close(ctx)
 		if err != nil {
 			t.Errorf("Failed to close storage: %v", err)
 		}
@@ -177,15 +178,15 @@ func testNoteStorage(t *testing.T, storage NoteStorage) {
 }
 
 // cleanupStorage is a helper function to clean up any existing notes in the storage
-func cleanupStorage(t *testing.T, storage NoteStorage) {
-	notes, err := storage.GetAll()
+func cleanupStorage(t *testing.T, storage NoteStorage, ctx context.Context) {
+	notes, err := storage.GetAll(ctx)
 	if err != nil {
 		t.Logf("Warning: Failed to get all notes for cleanup: %v", err)
 		return
 	}
 
 	for _, note := range notes {
-		err := storage.Delete(note.ID)
+		err := storage.Delete(ctx, note.ID)
 		if err != nil {
 			t.Logf("Warning: Failed to delete note %s during cleanup: %v", note.ID, err)
 		}

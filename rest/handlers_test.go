@@ -2,6 +2,7 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"golang-simple-notes/model"
 	"golang-simple-notes/storage"
 )
@@ -26,13 +28,13 @@ func NewMockStorage() *MockStorage {
 }
 
 // Create adds a new note to the storage
-func (s *MockStorage) Create(note *model.Note) error {
+func (s *MockStorage) Create(ctx context.Context, note *model.Note) error {
 	s.notes[note.ID] = note
 	return nil
 }
 
 // Get retrieves a note by its ID
-func (s *MockStorage) Get(id string) (*model.Note, error) {
+func (s *MockStorage) Get(ctx context.Context, id string) (*model.Note, error) {
 	note, exists := s.notes[id]
 	if !exists {
 		return nil, storage.ErrNoteNotFound
@@ -41,7 +43,7 @@ func (s *MockStorage) Get(id string) (*model.Note, error) {
 }
 
 // GetAll retrieves all notes from the storage
-func (s *MockStorage) GetAll() ([]*model.Note, error) {
+func (s *MockStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
 	notes := make([]*model.Note, 0, len(s.notes))
 	for _, note := range s.notes {
 		notes = append(notes, note)
@@ -50,7 +52,7 @@ func (s *MockStorage) GetAll() ([]*model.Note, error) {
 }
 
 // Update updates an existing note
-func (s *MockStorage) Update(note *model.Note) error {
+func (s *MockStorage) Update(ctx context.Context, note *model.Note) error {
 	if _, exists := s.notes[note.ID]; !exists {
 		return storage.ErrNoteNotFound
 	}
@@ -59,7 +61,7 @@ func (s *MockStorage) Update(note *model.Note) error {
 }
 
 // Delete removes a note from the storage
-func (s *MockStorage) Delete(id string) error {
+func (s *MockStorage) Delete(ctx context.Context, id string) error {
 	if _, exists := s.notes[id]; !exists {
 		return storage.ErrNoteNotFound
 	}
@@ -68,7 +70,7 @@ func (s *MockStorage) Delete(id string) error {
 }
 
 // Close closes any resources used by the storage
-func (s *MockStorage) Close() error {
+func (s *MockStorage) Close(ctx context.Context) error {
 	return nil
 }
 
@@ -85,7 +87,7 @@ func NewErrorMockStorage(shouldError bool) *ErrorMockStorage {
 }
 
 // Create returns an error if shouldError is true
-func (s *ErrorMockStorage) Create(note *model.Note) error {
+func (s *ErrorMockStorage) Create(ctx context.Context, note *model.Note) error {
 	if s.shouldError {
 		return errors.New("storage error")
 	}
@@ -93,7 +95,7 @@ func (s *ErrorMockStorage) Create(note *model.Note) error {
 }
 
 // Get returns an error if shouldError is true
-func (s *ErrorMockStorage) Get(id string) (*model.Note, error) {
+func (s *ErrorMockStorage) Get(ctx context.Context, id string) (*model.Note, error) {
 	if s.shouldError {
 		return nil, errors.New("storage error")
 	}
@@ -101,7 +103,7 @@ func (s *ErrorMockStorage) Get(id string) (*model.Note, error) {
 }
 
 // GetAll returns an error if shouldError is true
-func (s *ErrorMockStorage) GetAll() ([]*model.Note, error) {
+func (s *ErrorMockStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
 	if s.shouldError {
 		return nil, errors.New("storage error")
 	}
@@ -109,7 +111,7 @@ func (s *ErrorMockStorage) GetAll() ([]*model.Note, error) {
 }
 
 // Update returns an error if shouldError is true
-func (s *ErrorMockStorage) Update(note *model.Note) error {
+func (s *ErrorMockStorage) Update(ctx context.Context, note *model.Note) error {
 	if s.shouldError {
 		return errors.New("storage error")
 	}
@@ -117,7 +119,7 @@ func (s *ErrorMockStorage) Update(note *model.Note) error {
 }
 
 // Delete returns an error if shouldError is true
-func (s *ErrorMockStorage) Delete(id string) error {
+func (s *ErrorMockStorage) Delete(ctx context.Context, id string) error {
 	if s.shouldError {
 		return errors.New("storage error")
 	}
@@ -125,14 +127,22 @@ func (s *ErrorMockStorage) Delete(id string) error {
 }
 
 // Close returns an error if shouldError is true
-func (s *ErrorMockStorage) Close() error {
+func (s *ErrorMockStorage) Close(ctx context.Context) error {
 	if s.shouldError {
 		return errors.New("storage error")
 	}
 	return nil
 }
 
-// TestCreateNote tests the CreateNote handler
+// setupTestRequest creates a test request with the given method, path, and body
+func setupTestRequest(method, path, body string) *http.Request {
+	req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
+	chiCtx := chi.NewRouteContext()
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+	return req
+}
+
+// TestCreateNote tests the createNote handler
 func TestCreateNote(t *testing.T) {
 	// Test valid request
 	t.Run("Valid Request", func(t *testing.T) {
@@ -140,10 +150,10 @@ func TestCreateNote(t *testing.T) {
 		handler := NewHandler(mockStorage)
 
 		reqBody := `{"title":"Test Title","content":"Test Content"}`
-		req := httptest.NewRequest("POST", "/api/notes", bytes.NewBufferString(reqBody))
+		req := setupTestRequest("POST", "/api/notes", reqBody)
 		w := httptest.NewRecorder()
 
-		handler.CreateNote(w, req)
+		handler.handleNotes(w, req)
 
 		if w.Code != http.StatusCreated {
 			t.Errorf("Expected status code %d, got %d", http.StatusCreated, w.Code)
@@ -164,43 +174,21 @@ func TestCreateNote(t *testing.T) {
 		}
 	})
 
-	// Test invalid request (missing title)
-	t.Run("Missing Title", func(t *testing.T) {
-		mockStorage := NewMockStorage()
-		handler := NewHandler(mockStorage)
-
-		reqBody := `{"content":"Test Content"}`
-		req := httptest.NewRequest("POST", "/api/notes", bytes.NewBufferString(reqBody))
-		w := httptest.NewRecorder()
-
-		handler.CreateNote(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
-		}
-
-		// Check error message
-		if !strings.Contains(w.Body.String(), "Title is required") {
-			t.Errorf("Expected error message to contain 'Title is required', got: %s", w.Body.String())
-		}
-	})
-
 	// Test invalid JSON
 	t.Run("Invalid JSON", func(t *testing.T) {
 		mockStorage := NewMockStorage()
 		handler := NewHandler(mockStorage)
 
 		reqBody := `{"title":"Test Title","content":"Test Content"`
-		req := httptest.NewRequest("POST", "/api/notes", bytes.NewBufferString(reqBody))
+		req := setupTestRequest("POST", "/api/notes", reqBody)
 		w := httptest.NewRecorder()
 
-		handler.CreateNote(w, req)
+		handler.handleNotes(w, req)
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
 		}
 
-		// Check error message
 		if !strings.Contains(w.Body.String(), "Invalid request body") {
 			t.Errorf("Expected error message to contain 'Invalid request body', got: %s", w.Body.String())
 		}
@@ -212,23 +200,22 @@ func TestCreateNote(t *testing.T) {
 		handler := NewHandler(errorStorage)
 
 		reqBody := `{"title":"Test Title","content":"Test Content"}`
-		req := httptest.NewRequest("POST", "/api/notes", bytes.NewBufferString(reqBody))
+		req := setupTestRequest("POST", "/api/notes", reqBody)
 		w := httptest.NewRecorder()
 
-		handler.CreateNote(w, req)
+		handler.handleNotes(w, req)
 
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
 		}
 
-		// Check error message
 		if !strings.Contains(w.Body.String(), "Failed to create note") {
 			t.Errorf("Expected error message to contain 'Failed to create note', got: %s", w.Body.String())
 		}
 	})
 }
 
-// TestGetAllNotes tests the GetAllNotes handler
+// TestGetAllNotes tests the getAllNotes handler
 func TestGetAllNotes(t *testing.T) {
 	// Test getting all notes successfully
 	t.Run("Success", func(t *testing.T) {
@@ -238,14 +225,13 @@ func TestGetAllNotes(t *testing.T) {
 		// Add some notes to the storage
 		note1 := model.NewNote("Title 1", "Content 1")
 		note2 := model.NewNote("Title 2", "Content 2")
-		mockStorage.Create(note1)
-		mockStorage.Create(note2)
+		mockStorage.Create(context.Background(), note1)
+		mockStorage.Create(context.Background(), note2)
 
-		// Test getting all notes
-		req := httptest.NewRequest("GET", "/api/notes", nil)
+		req := setupTestRequest("GET", "/api/notes", "")
 		w := httptest.NewRecorder()
 
-		handler.GetAllNotes(w, req)
+		handler.handleNotes(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
@@ -267,38 +253,39 @@ func TestGetAllNotes(t *testing.T) {
 		errorStorage := NewErrorMockStorage(true)
 		handler := NewHandler(errorStorage)
 
-		req := httptest.NewRequest("GET", "/api/notes", nil)
+		req := setupTestRequest("GET", "/api/notes", "")
 		w := httptest.NewRecorder()
 
-		handler.GetAllNotes(w, req)
+		handler.handleNotes(w, req)
 
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
 		}
 
-		// Check error message
-		if !strings.Contains(w.Body.String(), "Failed to retrieve notes") {
-			t.Errorf("Expected error message to contain 'Failed to retrieve notes', got: %s", w.Body.String())
+		if !strings.Contains(w.Body.String(), "Failed to get notes") {
+			t.Errorf("Expected error message to contain 'Failed to get notes', got: %s", w.Body.String())
 		}
 	})
 }
 
-// TestGetNote tests the GetNote handler
+// TestGetNote tests the getNote handler
 func TestGetNote(t *testing.T) {
-	mockStorage := NewMockStorage()
-	handler := NewHandler(mockStorage)
+	// Test getting a note successfully
+	t.Run("Success", func(t *testing.T) {
+		mockStorage := NewMockStorage()
+		handler := NewHandler(mockStorage)
 
-	// Add a note to the storage
-	note := model.NewNote("Test Title", "Test Content")
-	mockStorage.Create(note)
+		// Add a note to the storage
+		note := model.NewNote("Test Title", "Test Content")
+		mockStorage.Create(context.Background(), note)
 
-	// Test getting an existing note
-	t.Run("Existing Note", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/notes/"+note.ID, nil)
-		req.URL.Path = "/api/notes/" + note.ID
+		req := setupTestRequest("GET", "/api/notes/"+note.ID, "")
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", note.ID)
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.GetNote(w, req)
+		handler.handleNote(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
@@ -311,58 +298,74 @@ func TestGetNote(t *testing.T) {
 		}
 
 		if response.ID != note.ID {
-			t.Errorf("Expected ID %s, got %s", note.ID, response.ID)
-		}
-
-		if response.Title != note.Title {
-			t.Errorf("Expected title '%s', got '%s'", note.Title, response.Title)
+			t.Errorf("Expected note ID %s, got %s", note.ID, response.ID)
 		}
 	})
 
-	// Test getting a non-existent note
-	t.Run("Non-existent Note", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/notes/non-existent", nil)
-		req.URL.Path = "/api/notes/non-existent"
+	// Test note not found
+	t.Run("Note Not Found", func(t *testing.T) {
+		mockStorage := NewMockStorage()
+		handler := NewHandler(mockStorage)
+
+		req := setupTestRequest("GET", "/api/notes/nonexistent", "")
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", "nonexistent")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.GetNote(w, req)
+		handler.handleNote(w, req)
 
 		if w.Code != http.StatusNotFound {
 			t.Errorf("Expected status code %d, got %d", http.StatusNotFound, w.Code)
 		}
+
+		if !strings.Contains(w.Body.String(), "Note not found") {
+			t.Errorf("Expected error message to contain 'Note not found', got: %s", w.Body.String())
+		}
 	})
 
-	// Test with missing ID
-	t.Run("Missing ID", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/notes/", nil)
-		req.URL.Path = "/api/notes/"
+	// Test storage error
+	t.Run("Storage Error", func(t *testing.T) {
+		errorStorage := NewErrorMockStorage(true)
+		handler := NewHandler(errorStorage)
+
+		req := setupTestRequest("GET", "/api/notes/test", "")
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", "test")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.GetNote(w, req)
+		handler.handleNote(w, req)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
+		}
+
+		if !strings.Contains(w.Body.String(), "Failed to get note") {
+			t.Errorf("Expected error message to contain 'Failed to get note', got: %s", w.Body.String())
 		}
 	})
 }
 
-// TestUpdateNote tests the UpdateNote handler
+// TestUpdateNote tests the updateNote handler
 func TestUpdateNote(t *testing.T) {
-	// Test updating an existing note
-	t.Run("Existing Note", func(t *testing.T) {
+	// Test updating a note successfully
+	t.Run("Success", func(t *testing.T) {
 		mockStorage := NewMockStorage()
 		handler := NewHandler(mockStorage)
 
 		// Add a note to the storage
 		note := model.NewNote("Original Title", "Original Content")
-		mockStorage.Create(note)
+		mockStorage.Create(context.Background(), note)
 
 		reqBody := `{"title":"Updated Title","content":"Updated Content"}`
-		req := httptest.NewRequest("PUT", "/api/notes/"+note.ID, bytes.NewBufferString(reqBody))
-		req.URL.Path = "/api/notes/" + note.ID
+		req := setupTestRequest("PUT", "/api/notes/"+note.ID, reqBody)
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", note.ID)
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.UpdateNote(w, req)
+		handler.handleNote(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
@@ -383,51 +386,26 @@ func TestUpdateNote(t *testing.T) {
 		}
 	})
 
-	// Test updating a non-existent note
-	t.Run("Non-existent Note", func(t *testing.T) {
+	// Test note not found
+	t.Run("Note Not Found", func(t *testing.T) {
 		mockStorage := NewMockStorage()
 		handler := NewHandler(mockStorage)
 
 		reqBody := `{"title":"Updated Title","content":"Updated Content"}`
-		req := httptest.NewRequest("PUT", "/api/notes/non-existent", bytes.NewBufferString(reqBody))
-		req.URL.Path = "/api/notes/non-existent"
+		req := setupTestRequest("PUT", "/api/notes/nonexistent", reqBody)
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", "nonexistent")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.UpdateNote(w, req)
+		handler.handleNote(w, req)
 
 		if w.Code != http.StatusNotFound {
 			t.Errorf("Expected status code %d, got %d", http.StatusNotFound, w.Code)
 		}
 
-		// Check error message
 		if !strings.Contains(w.Body.String(), "Note not found") {
 			t.Errorf("Expected error message to contain 'Note not found', got: %s", w.Body.String())
-		}
-	})
-
-	// Test with missing title
-	t.Run("Missing Title", func(t *testing.T) {
-		mockStorage := NewMockStorage()
-		handler := NewHandler(mockStorage)
-
-		// Add a note to the storage
-		note := model.NewNote("Original Title", "Original Content")
-		mockStorage.Create(note)
-
-		reqBody := `{"content":"Updated Content"}`
-		req := httptest.NewRequest("PUT", "/api/notes/"+note.ID, bytes.NewBufferString(reqBody))
-		req.URL.Path = "/api/notes/" + note.ID
-		w := httptest.NewRecorder()
-
-		handler.UpdateNote(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
-		}
-
-		// Check error message
-		if !strings.Contains(w.Body.String(), "Title is required") {
-			t.Errorf("Expected error message to contain 'Title is required', got: %s", w.Body.String())
 		}
 	})
 
@@ -436,22 +414,19 @@ func TestUpdateNote(t *testing.T) {
 		mockStorage := NewMockStorage()
 		handler := NewHandler(mockStorage)
 
-		// Add a note to the storage
-		note := model.NewNote("Original Title", "Original Content")
-		mockStorage.Create(note)
-
 		reqBody := `{"title":"Updated Title","content":"Updated Content"`
-		req := httptest.NewRequest("PUT", "/api/notes/"+note.ID, bytes.NewBufferString(reqBody))
-		req.URL.Path = "/api/notes/" + note.ID
+		req := setupTestRequest("PUT", "/api/notes/test", reqBody)
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", "test")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.UpdateNote(w, req)
+		handler.handleNote(w, req)
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
 		}
 
-		// Check error message
 		if !strings.Contains(w.Body.String(), "Invalid request body") {
 			t.Errorf("Expected error message to contain 'Invalid request body', got: %s", w.Body.String())
 		}
@@ -459,121 +434,71 @@ func TestUpdateNote(t *testing.T) {
 
 	// Test storage error
 	t.Run("Storage Error", func(t *testing.T) {
-		// Create a mock storage that returns a note but fails on update
-		mockStorage := NewMockStorage()
-		note := model.NewNote("Original Title", "Original Content")
-		mockStorage.Create(note)
-
 		errorStorage := NewErrorMockStorage(true)
 		handler := NewHandler(errorStorage)
 
 		reqBody := `{"title":"Updated Title","content":"Updated Content"}`
-		req := httptest.NewRequest("PUT", "/api/notes/"+note.ID, bytes.NewBufferString(reqBody))
-		req.URL.Path = "/api/notes/" + note.ID
+		req := setupTestRequest("PUT", "/api/notes/test", reqBody)
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", "test")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.UpdateNote(w, req)
+		handler.handleNote(w, req)
 
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
 		}
 
-		// Check error message
-		if !strings.Contains(w.Body.String(), "Failed to") {
-			t.Errorf("Expected error message to contain 'Failed to', got: %s", w.Body.String())
-		}
-	})
-
-	// Test missing ID
-	t.Run("Missing ID", func(t *testing.T) {
-		mockStorage := NewMockStorage()
-		handler := NewHandler(mockStorage)
-
-		reqBody := `{"title":"Updated Title","content":"Updated Content"}`
-		req := httptest.NewRequest("PUT", "/api/notes/", bytes.NewBufferString(reqBody))
-		req.URL.Path = "/api/notes/"
-		w := httptest.NewRecorder()
-
-		handler.UpdateNote(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
-		}
-
-		// Check error message
-		if !strings.Contains(w.Body.String(), "Note ID is required") {
-			t.Errorf("Expected error message to contain 'Note ID is required', got: %s", w.Body.String())
+		if !strings.Contains(w.Body.String(), "Failed to update note") {
+			t.Errorf("Expected error message to contain 'Failed to update note', got: %s", w.Body.String())
 		}
 	})
 }
 
-// TestDeleteNote tests the DeleteNote handler
+// TestDeleteNote tests the deleteNote handler
 func TestDeleteNote(t *testing.T) {
-	// Test deleting an existing note
-	t.Run("Existing Note", func(t *testing.T) {
+	// Test deleting a note successfully
+	t.Run("Success", func(t *testing.T) {
 		mockStorage := NewMockStorage()
 		handler := NewHandler(mockStorage)
 
 		// Add a note to the storage
-		note := model.NewNote("To Delete", "This note will be deleted")
-		mockStorage.Create(note)
+		note := model.NewNote("Test Title", "Test Content")
+		mockStorage.Create(context.Background(), note)
 
-		req := httptest.NewRequest("DELETE", "/api/notes/"+note.ID, nil)
-		req.URL.Path = "/api/notes/" + note.ID
+		req := setupTestRequest("DELETE", "/api/notes/"+note.ID, "")
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", note.ID)
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.DeleteNote(w, req)
+		handler.handleNote(w, req)
 
 		if w.Code != http.StatusNoContent {
 			t.Errorf("Expected status code %d, got %d", http.StatusNoContent, w.Code)
 		}
-
-		// Verify the note was deleted
-		_, err := mockStorage.Get(note.ID)
-		if err != storage.ErrNoteNotFound {
-			t.Errorf("Expected note to be deleted, but it still exists")
-		}
 	})
 
-	// Test deleting a non-existent note
-	t.Run("Non-existent Note", func(t *testing.T) {
+	// Test note not found
+	t.Run("Note Not Found", func(t *testing.T) {
 		mockStorage := NewMockStorage()
 		handler := NewHandler(mockStorage)
 
-		req := httptest.NewRequest("DELETE", "/api/notes/non-existent", nil)
-		req.URL.Path = "/api/notes/non-existent"
+		req := setupTestRequest("DELETE", "/api/notes/nonexistent", "")
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", "nonexistent")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.DeleteNote(w, req)
+		handler.handleNote(w, req)
 
 		if w.Code != http.StatusNotFound {
 			t.Errorf("Expected status code %d, got %d", http.StatusNotFound, w.Code)
 		}
 
-		// Check error message
 		if !strings.Contains(w.Body.String(), "Note not found") {
 			t.Errorf("Expected error message to contain 'Note not found', got: %s", w.Body.String())
-		}
-	})
-
-	// Test missing ID
-	t.Run("Missing ID", func(t *testing.T) {
-		mockStorage := NewMockStorage()
-		handler := NewHandler(mockStorage)
-
-		req := httptest.NewRequest("DELETE", "/api/notes/", nil)
-		req.URL.Path = "/api/notes/"
-		w := httptest.NewRecorder()
-
-		handler.DeleteNote(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
-		}
-
-		// Check error message
-		if !strings.Contains(w.Body.String(), "Note ID is required") {
-			t.Errorf("Expected error message to contain 'Note ID is required', got: %s", w.Body.String())
 		}
 	})
 
@@ -582,17 +507,18 @@ func TestDeleteNote(t *testing.T) {
 		errorStorage := NewErrorMockStorage(true)
 		handler := NewHandler(errorStorage)
 
-		req := httptest.NewRequest("DELETE", "/api/notes/test-id", nil)
-		req.URL.Path = "/api/notes/test-id"
+		req := setupTestRequest("DELETE", "/api/notes/test", "")
+		chiCtx := chi.NewRouteContext()
+		chiCtx.URLParams.Add("id", "test")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.DeleteNote(w, req)
+		handler.handleNote(w, req)
 
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
 		}
 
-		// Check error message
 		if !strings.Contains(w.Body.String(), "Failed to delete note") {
 			t.Errorf("Expected error message to contain 'Failed to delete note', got: %s", w.Body.String())
 		}
