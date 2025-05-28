@@ -13,6 +13,9 @@ import (
 	"golang-simple-notes/model"
 	"golang-simple-notes/rest"
 	"golang-simple-notes/storage"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 // App represents the main application
@@ -98,12 +101,17 @@ func (a *App) initializeStorage(ctx context.Context) (storage.NoteStorage, error
 // setupRESTServer creates and configures the REST server
 func (a *App) setupRESTServer() *http.Server {
 	restHandler := rest.NewHandler(a.storage)
-	mux := http.NewServeMux()
-	restHandler.RegisterRoutes(mux)
+	r := chi.NewRouter()
+
+	// Middleware
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	restHandler.RegisterRoutes(r)
 
 	return &http.Server{
 		Addr:    a.config.RESTPort,
-		Handler: mux,
+		Handler: r,
 	}
 }
 

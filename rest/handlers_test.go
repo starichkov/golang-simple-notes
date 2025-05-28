@@ -155,7 +155,7 @@ func TestCreateNote(t *testing.T) {
 		req := setupTestRequest("POST", "/api/notes", reqBody)
 		w := httptest.NewRecorder()
 
-		handler.handleNotes(w, req)
+		handler.createNote(w, req)
 
 		if w.Code != http.StatusCreated {
 			t.Errorf("Expected status code %d, got %d", http.StatusCreated, w.Code)
@@ -185,7 +185,7 @@ func TestCreateNote(t *testing.T) {
 		req := setupTestRequest("POST", "/api/notes", reqBody)
 		w := httptest.NewRecorder()
 
-		handler.handleNotes(w, req)
+		handler.createNote(w, req)
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -205,7 +205,7 @@ func TestCreateNote(t *testing.T) {
 		req := setupTestRequest("POST", "/api/notes", reqBody)
 		w := httptest.NewRecorder()
 
-		handler.handleNotes(w, req)
+		handler.createNote(w, req)
 
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
@@ -233,7 +233,7 @@ func TestGetAllNotes(t *testing.T) {
 		req := setupTestRequest("GET", "/api/notes", "")
 		w := httptest.NewRecorder()
 
-		handler.handleNotes(w, req)
+		handler.getAllNotes(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
@@ -258,7 +258,7 @@ func TestGetAllNotes(t *testing.T) {
 		req := setupTestRequest("GET", "/api/notes", "")
 		w := httptest.NewRecorder()
 
-		handler.handleNotes(w, req)
+		handler.getAllNotes(w, req)
 
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
@@ -287,7 +287,7 @@ func TestGetNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.getNote(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
@@ -315,7 +315,7 @@ func TestGetNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.getNote(w, req)
 
 		if w.Code != http.StatusNotFound {
 			t.Errorf("Expected status code %d, got %d", http.StatusNotFound, w.Code)
@@ -337,7 +337,7 @@ func TestGetNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.getNote(w, req)
 
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
@@ -367,7 +367,7 @@ func TestUpdateNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.updateNote(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
@@ -400,7 +400,7 @@ func TestUpdateNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.updateNote(w, req)
 
 		if w.Code != http.StatusNotFound {
 			t.Errorf("Expected status code %d, got %d", http.StatusNotFound, w.Code)
@@ -423,7 +423,7 @@ func TestUpdateNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.updateNote(w, req)
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -446,7 +446,7 @@ func TestUpdateNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.updateNote(w, req)
 
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
@@ -475,7 +475,7 @@ func TestDeleteNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.deleteNote(w, req)
 
 		if w.Code != http.StatusNoContent {
 			t.Errorf("Expected status code %d, got %d", http.StatusNoContent, w.Code)
@@ -493,7 +493,7 @@ func TestDeleteNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.deleteNote(w, req)
 
 		if w.Code != http.StatusNotFound {
 			t.Errorf("Expected status code %d, got %d", http.StatusNotFound, w.Code)
@@ -515,7 +515,7 @@ func TestDeleteNote(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 		w := httptest.NewRecorder()
 
-		handler.handleNote(w, req)
+		handler.deleteNote(w, req)
 
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
@@ -531,13 +531,13 @@ func TestDeleteNote(t *testing.T) {
 func TestHealthEndpoint(t *testing.T) {
 	mockStorage := NewMockStorage()
 	handler := NewHandler(mockStorage)
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	r := chi.NewRouter()
+	handler.RegisterRoutes(r)
 
 	t.Run("GET /health", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/health", nil)
 		w := httptest.NewRecorder()
-		mux.ServeHTTP(w, req)
+		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected status code 200, got %d", w.Code)
@@ -550,18 +550,15 @@ func TestHealthEndpoint(t *testing.T) {
 	t.Run("Method Not Allowed", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/health", nil)
 		w := httptest.NewRecorder()
-		mux.ServeHTTP(w, req)
+		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusMethodNotAllowed {
 			t.Errorf("Expected status code 405, got %d", w.Code)
 		}
-		if !strings.Contains(w.Body.String(), "Method not allowed") {
-			t.Errorf("Expected error message to contain 'Method not allowed', got: %s", w.Body.String())
-		}
 	})
 }
 
-// TestEmptyNoteID tests that handleNote returns 400 Bad Request when the ID is empty
+// TestEmptyNoteID tests that getNote returns 400 Bad Request when the ID is empty
 func TestEmptyNoteID(t *testing.T) {
 	mockStorage := NewMockStorage()
 	handler := NewHandler(mockStorage)
@@ -572,7 +569,7 @@ func TestEmptyNoteID(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 	w := httptest.NewRecorder()
 
-	handler.handleNote(w, req)
+	handler.getNote(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code 400, got %d", w.Code)
@@ -586,20 +583,19 @@ func TestEmptyNoteID(t *testing.T) {
 func TestUnsupportedMethods(t *testing.T) {
 	mockStorage := NewMockStorage()
 	handler := NewHandler(mockStorage)
+	r := chi.NewRouter()
+	handler.RegisterRoutes(r)
 
 	// Test unsupported methods on /api/notes
 	unsupportedMethods := []string{"PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"}
 	for _, method := range unsupportedMethods {
 		t.Run("Notes Endpoint - "+method, func(t *testing.T) {
-			req := setupTestRequest(method, "/api/notes", "")
+			req := httptest.NewRequest(method, "/api/notes", nil)
 			w := httptest.NewRecorder()
-			handler.handleNotes(w, req)
+			r.ServeHTTP(w, req)
 
 			if w.Code != http.StatusMethodNotAllowed {
 				t.Errorf("Expected status code 405 for %s, got %d", method, w.Code)
-			}
-			if !strings.Contains(w.Body.String(), "Method not allowed") {
-				t.Errorf("Expected error message to contain 'Method not allowed', got: %s", w.Body.String())
 			}
 		})
 	}
@@ -608,18 +604,12 @@ func TestUnsupportedMethods(t *testing.T) {
 	unsupportedNoteIDMethods := []string{"PATCH", "OPTIONS", "HEAD"}
 	for _, method := range unsupportedNoteIDMethods {
 		t.Run("Note Endpoint - "+method, func(t *testing.T) {
-			req := setupTestRequest(method, "/api/notes/test-id", "")
-			chiCtx := chi.NewRouteContext()
-			chiCtx.URLParams.Add("id", "test-id")
-			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+			req := httptest.NewRequest(method, "/api/notes/test-id", nil)
 			w := httptest.NewRecorder()
-			handler.handleNote(w, req)
+			r.ServeHTTP(w, req)
 
 			if w.Code != http.StatusMethodNotAllowed {
 				t.Errorf("Expected status code 405 for %s, got %d", method, w.Code)
-			}
-			if !strings.Contains(w.Body.String(), "Method not allowed") {
-				t.Errorf("Expected error message to contain 'Method not allowed', got: %s", w.Body.String())
 			}
 		})
 	}
@@ -648,12 +638,11 @@ func TestIsValidNoteID(t *testing.T) {
 	}
 }
 
-// TestHandleNote_EmptyAndInvalidID tests empty and invalid IDs for PUT and DELETE methods
-func TestHandleNote_EmptyAndInvalidID(t *testing.T) {
+// TestEmptyAndInvalidID tests empty and invalid IDs for PUT and DELETE methods
+func TestEmptyAndInvalidID(t *testing.T) {
 	mockStorage := NewMockStorage()
 	handler := NewHandler(mockStorage)
 
-	methods := []string{"PUT", "DELETE"}
 	invalidIDs := []struct {
 		id   string
 		msg  string
@@ -665,28 +654,51 @@ func TestHandleNote_EmptyAndInvalidID(t *testing.T) {
 		{strings.Repeat("a", 256), "Invalid note ID format", http.StatusBadRequest},
 	}
 
-	for _, method := range methods {
-		for _, tc := range invalidIDs {
-			t.Run(method+"/"+tc.id, func(t *testing.T) {
-				encodedID := tc.id
-				if encodedID != "" {
-					encodedID = url.PathEscape(tc.id)
-				}
-				req := setupTestRequest(method, "/api/notes/"+encodedID, "")
-				chiCtx := chi.NewRouteContext()
-				chiCtx.URLParams.Add("id", tc.id)
-				req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
-				w := httptest.NewRecorder()
+	// Test PUT method with updateNote
+	for _, tc := range invalidIDs {
+		t.Run("PUT/"+tc.id, func(t *testing.T) {
+			encodedID := tc.id
+			if encodedID != "" {
+				encodedID = url.PathEscape(tc.id)
+			}
+			req := setupTestRequest("PUT", "/api/notes/"+encodedID, `{"title":"Test","content":"Test"}`)
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("id", tc.id)
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+			w := httptest.NewRecorder()
 
-				handler.handleNote(w, req)
+			handler.updateNote(w, req)
 
-				if w.Code != tc.code {
-					t.Errorf("Expected status code %d, got %d", tc.code, w.Code)
-				}
-				if !strings.Contains(w.Body.String(), tc.msg) {
-					t.Errorf("Expected error message to contain '%s', got: %s", tc.msg, w.Body.String())
-				}
-			})
-		}
+			if w.Code != tc.code {
+				t.Errorf("Expected status code %d, got %d", tc.code, w.Code)
+			}
+			if !strings.Contains(w.Body.String(), tc.msg) {
+				t.Errorf("Expected error message to contain '%s', got: %s", tc.msg, w.Body.String())
+			}
+		})
+	}
+
+	// Test DELETE method with deleteNote
+	for _, tc := range invalidIDs {
+		t.Run("DELETE/"+tc.id, func(t *testing.T) {
+			encodedID := tc.id
+			if encodedID != "" {
+				encodedID = url.PathEscape(tc.id)
+			}
+			req := setupTestRequest("DELETE", "/api/notes/"+encodedID, "")
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("id", tc.id)
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+			w := httptest.NewRecorder()
+
+			handler.deleteNote(w, req)
+
+			if w.Code != tc.code {
+				t.Errorf("Expected status code %d, got %d", tc.code, w.Code)
+			}
+			if !strings.Contains(w.Body.String(), tc.msg) {
+				t.Errorf("Expected error message to contain '%s', got: %s", tc.msg, w.Body.String())
+			}
+		})
 	}
 }
