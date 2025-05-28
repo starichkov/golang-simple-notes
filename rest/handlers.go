@@ -2,11 +2,9 @@ package rest
 
 import (
 	"encoding/json"
-	"net/http"
-	"strings"
-
 	"golang-simple-notes/model"
 	"golang-simple-notes/storage"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -32,6 +30,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Post("/", h.createNote)
 
 		r.Route("/{id}", func(r chi.Router) {
+			r.Use(ValidateNoteIDMiddleware)
 			r.Get("/", h.getNote)
 			r.Put("/", h.updateNote)
 			r.Delete("/", h.deleteNote)
@@ -43,42 +42,6 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
-}
-
-// isValidNoteID checks if a note ID is valid
-func isValidNoteID(id string) bool {
-	// ID should not be empty
-	if id == "" {
-		return false
-	}
-
-	// ID should not contain spaces
-	if strings.Contains(id, " ") {
-		return false
-	}
-
-	// ID should not be too long (e.g., max 255 characters)
-	if len(id) > 255 {
-		return false
-	}
-
-	// ID should only contain alphanumeric characters, hyphens, and underscores
-	for _, c := range id {
-		if !isValidIDChar(c) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// isValidIDChar checks if a character is valid in a note ID
-func isValidIDChar(c rune) bool {
-	return (c >= 'a' && c <= 'z') ||
-		(c >= 'A' && c <= 'Z') ||
-		(c >= '0' && c <= '9') ||
-		c == '-' ||
-		c == '_'
 }
 
 // getAllNotes handles GET /api/notes
@@ -99,14 +62,6 @@ func (h *Handler) getAllNotes(w http.ResponseWriter, r *http.Request) {
 // getNote handles GET /api/notes/{id}
 func (h *Handler) getNote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if id == "" {
-		http.Error(w, "Note ID is required", http.StatusBadRequest)
-		return
-	}
-	if !isValidNoteID(id) {
-		http.Error(w, "Invalid note ID format", http.StatusBadRequest)
-		return
-	}
 
 	note, err := h.storage.Get(r.Context(), id)
 	if err != nil {
@@ -149,14 +104,6 @@ func (h *Handler) createNote(w http.ResponseWriter, r *http.Request) {
 // updateNote handles PUT /api/notes/{id}
 func (h *Handler) updateNote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if id == "" {
-		http.Error(w, "Note ID is required", http.StatusBadRequest)
-		return
-	}
-	if !isValidNoteID(id) {
-		http.Error(w, "Invalid note ID format", http.StatusBadRequest)
-		return
-	}
 
 	var note model.Note
 	if err := json.NewDecoder(r.Body).Decode(&note); err != nil {
@@ -184,14 +131,6 @@ func (h *Handler) updateNote(w http.ResponseWriter, r *http.Request) {
 // deleteNote handles DELETE /api/notes/{id}
 func (h *Handler) deleteNote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if id == "" {
-		http.Error(w, "Note ID is required", http.StatusBadRequest)
-		return
-	}
-	if !isValidNoteID(id) {
-		http.Error(w, "Invalid note ID format", http.StatusBadRequest)
-		return
-	}
 
 	if err := h.storage.Delete(r.Context(), id); err != nil {
 		if err == storage.ErrNoteNotFound {

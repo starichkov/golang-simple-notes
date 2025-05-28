@@ -558,7 +558,7 @@ func TestHealthEndpoint(t *testing.T) {
 	})
 }
 
-// TestEmptyNoteID tests that getNote returns 400 Bad Request when the ID is empty
+// TestEmptyNoteID tests that the middleware returns 400 Bad Request when the ID is empty
 func TestEmptyNoteID(t *testing.T) {
 	mockStorage := NewMockStorage()
 	handler := NewHandler(mockStorage)
@@ -569,7 +569,8 @@ func TestEmptyNoteID(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 	w := httptest.NewRecorder()
 
-	handler.getNote(w, req)
+	// Apply the middleware before calling the handler
+	ValidateNoteIDMiddleware(http.HandlerFunc(handler.getNote)).ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code 400, got %d", w.Code)
@@ -667,7 +668,8 @@ func TestEmptyAndInvalidID(t *testing.T) {
 			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 			w := httptest.NewRecorder()
 
-			handler.updateNote(w, req)
+			// Apply the middleware before calling the handler
+			ValidateNoteIDMiddleware(http.HandlerFunc(handler.updateNote)).ServeHTTP(w, req)
 
 			if w.Code != tc.code {
 				t.Errorf("Expected status code %d, got %d", tc.code, w.Code)
@@ -691,7 +693,8 @@ func TestEmptyAndInvalidID(t *testing.T) {
 			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
 			w := httptest.NewRecorder()
 
-			handler.deleteNote(w, req)
+			// Apply the middleware before calling the handler
+			ValidateNoteIDMiddleware(http.HandlerFunc(handler.deleteNote)).ServeHTTP(w, req)
 
 			if w.Code != tc.code {
 				t.Errorf("Expected status code %d, got %d", tc.code, w.Code)
