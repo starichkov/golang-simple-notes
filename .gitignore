@@ -33,11 +33,7 @@ jspm_packages/
 /_output/
 /_build/
 
-# Test binary, built with `go test -c`
-*.test
-
 # Output of the go coverage tool
-*.out
 *.prof
 coverage.txt
 coverage.html
