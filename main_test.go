@@ -94,7 +94,7 @@ func (s *ErrorMockStorage) Close(ctx context.Context) error {
 // startCouchDBContainer starts a CouchDB container and returns the container and connection URL
 func startCouchDBContainer(ctx context.Context) (testcontainers.Container, string, error) {
 	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.3.2",
+		Image:        "couchdb:3.3.3",
 		ExposedPorts: []string{"5984/tcp"},
 		WaitingFor:   wait.ForListeningPort("5984/tcp"),
 		Env: map[string]string{
