@@ -108,7 +108,7 @@ To use CouchDB, you need to have CouchDB running. You can start CouchDB using Do
 docker run -d -p 5984:5984 --name couchdb \
   -e COUCHDB_USER=admin \
   -e COUCHDB_PASSWORD=password \
-  couchdb:3.3.3
+  couchdb:3.4.3
 ```
 
 Then, set the environment variables and run the application:

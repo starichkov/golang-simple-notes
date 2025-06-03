@@ -101,7 +101,7 @@ func (c *MyLogConsumer) Accept(log testcontainers.Log) {
 func startCouchDBContainer(ctx context.Context) (testcontainers.Container, string, error) {
 	consumer := &MyLogConsumer{}
 	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.3.3",
+		Image:        "couchdb:3.4.3",
 		ExposedPorts: []string{"5984/tcp"},
 		WaitingFor:   wait.ForListeningPort("5984/tcp"),
 		Env: map[string]string{

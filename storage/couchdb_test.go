@@ -28,7 +28,7 @@ func TestCouchDBStorage(t *testing.T) {
 
 	// Define the CouchDB container request
 	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.3.3",
+		Image:        "couchdb:3.4.3",
 		ExposedPorts: []string{"5984/tcp"},
 		Env: map[string]string{
 			"COUCHDB_USER":     "admin",
@@ -208,7 +208,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 
 	// Define the CouchDB container request
 	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.3.3",
+		Image:        "couchdb:3.4.3",
 		ExposedPorts: []string{"5984/tcp"},
 		Env: map[string]string{
 			"COUCHDB_USER":     "admin",

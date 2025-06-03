@@ -1,7 +1,7 @@
 services:
   # CouchDB service
   couchdb:
-    image: couchdb:3.3.3
+    image: couchdb:3.4.3
     container_name: notes-couchdb
     environment:
       - COUCHDB_USER=admin
