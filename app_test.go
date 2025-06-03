@@ -119,7 +119,7 @@ func TestApp_InitializeWithMongoDB(t *testing.T) {
 	ctx := context.Background()
 
 	// Start MongoDB container
-	mongoContainer, err := mongodb.RunContainer(ctx, testcontainers.WithImage("mongo:6.0"))
+	mongoContainer, err := mongodb.RunContainer(ctx, testcontainers.WithImage("mongo:7.0.20-jammy"))
 	if err != nil {
 		t.Fatalf("Failed to start MongoDB container: %v", err)
 	}
