@@ -91,8 +91,15 @@ func (s *ErrorMockStorage) Close(ctx context.Context) error {
 	return nil
 }
 
+type MyLogConsumer struct{}
+
+func (c *MyLogConsumer) Accept(log testcontainers.Log) {
+	fmt.Printf("Log: %s\n", string(log.Content))
+}
+
 // startCouchDBContainer starts a CouchDB container and returns the container and connection URL
 func startCouchDBContainer(ctx context.Context) (testcontainers.Container, string, error) {
+	consumer := &MyLogConsumer{}
 	req := testcontainers.ContainerRequest{
 		Image:        "couchdb:3.3.3",
 		ExposedPorts: []string{"5984/tcp"},
@@ -100,6 +107,11 @@ func startCouchDBContainer(ctx context.Context) (testcontainers.Container, strin
 		Env: map[string]string{
 			"COUCHDB_USER":     "admin",
 			"COUCHDB_PASSWORD": "password",
+		},
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Consumers: []testcontainers.LogConsumer{
+				consumer,
+			},
 		},
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
