@@ -202,6 +202,8 @@ func (a *App) createSampleNotes(ctx context.Context) error {
 			}
 			return fmt.Errorf("failed to create sample note: %w", err)
 		}
+		// Add a small delay to ensure unique IDs when using timestamp-based ID generation
+		time.Sleep(1 * time.Millisecond)
 	}
 
 	return nil
