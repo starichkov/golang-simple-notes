@@ -1,12 +1,20 @@
-# Notes Management API
-
+[![Author](https://img.shields.io/badge/Author-Vadim%20Starichkov-blue?style=for-the-badge)](https://github.com/starichkov)
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/starichkov/golang-simple-notes/build.yml?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/actions/workflows/build.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/starichkov/golang-simple-notes?style=for-the-badge)](https://codecov.io/gh/starichkov/golang-simple-notes)
 [![GitHub License](https://img.shields.io/github/license/starichkov/golang-simple-notes?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/blob/main/LICENSE.md)
 
+Notes API: Golang with NoSQL Databases
+=
+
 A simple microservice for notes management with REST and gRPC APIs, with support for multiple storage backends.
 
 **This project is generated using JetBrains Junie and several other AI coding agents, to evaluate agents capabilities.**
+
+## 👨‍💻 Author
+
+**Vadim Starichkov** | [GitHub](https://github.com/starichkov) | [Email](mailto:starichkovva@gmail.com)
+
+*Developed to demonstrate modern Golang development practices and patterns*
 
 ## Features
 
@@ -278,3 +286,19 @@ The application can be configured using environment variables:
 - `MONGODB_URI` - The URI of the MongoDB server (default: "mongodb://localhost:27017")
 - `MONGODB_DB` - The name of the MongoDB database (default: "notes")
 - `MONGODB_COLLECTION` - The name of the MongoDB collection (default: "notes")
+
+## 📄 License & Attribution
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE.md) file for details.
+
+### Using This Project?
+
+If you use this code in your own projects, attribution is required under the MIT License:
+
+```
+Based on golang-simple-notes by Vadim Starichkov, TemplateTasks
+
+https://github.com/starichkov/golang-simple-notes
+```
+
+**Copyright © 2025 Vadim Starichkov, TemplateTasks**
