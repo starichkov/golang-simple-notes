@@ -12,7 +12,7 @@ A simple microservice for notes management with REST and gRPC APIs, with support
 
 ## 👨‍💻 Author
 
-**Vadim Starichkov** | [GitHub](https://github.com/starichkov) | [Email](mailto:starichkovva@gmail.com)
+**Vadim Starichkov** | [GitHub](https://github.com/starichkov) | [LinkedIn](https://www.linkedin.com/in/vadim-starichkov/)
 
 *Developed to demonstrate modern Golang development practices and patterns*
 
