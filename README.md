@@ -287,6 +287,11 @@ The application can be configured using environment variables:
 - `MONGODB_DB` - The name of the MongoDB database (default: "notes")
 - `MONGODB_COLLECTION` - The name of the MongoDB collection (default: "notes")
 
+## 🧾 About TemplateTasks
+
+TemplateTasks is a developer-focused initiative by Vadim Starichkov, currently operated as sole proprietorship in Finland.  
+All code is released under open-source licenses. Ownership may be transferred to a registered business entity in the future.
+
 ## 📄 License & Attribution
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE.md) file for details.
