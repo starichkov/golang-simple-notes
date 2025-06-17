@@ -5,6 +5,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -84,6 +85,23 @@ func NewCouchDBStorage(url, dbName string) (*CouchDBStorage, error) {
 		}
 	}
 
+	// Create system databases if they don't exist
+	systemDBs := []string{"_users", "_replicator", "_global_changes"}
+	for _, sysDB := range systemDBs {
+		exists, err := client.DBExists(context.Background(), sysDB)
+		if err != nil {
+			log.Printf("Failed to check if system database %s exists: %v", sysDB, err)
+			continue
+		}
+		if !exists {
+			if err := client.CreateDB(context.Background(), sysDB); err != nil {
+				log.Printf("Failed to create system database %s: %v", sysDB, err)
+			} else {
+				log.Printf("Created system database: %s", sysDB)
+			}
+		}
+	}
+
 	// Get a handle to the database
 	db := client.DB(dbName)
 	if db.Err() != nil {
@@ -101,12 +119,55 @@ func NewCouchDBStorage(url, dbName string) (*CouchDBStorage, error) {
 // It uses the Kivik library's Put method to store the note as a JSON document.
 // The note's ID is used as the document ID in CouchDB.
 func (s *CouchDBStorage) Create(ctx context.Context, note *model.Note) error {
+	// Add debug logging
+	log.Printf("Creating note with ID: %s, Title: %s", note.ID, note.Title)
+
+	// Check if the database exists and is accessible
+	exists, err := s.client.DBExists(ctx, s.db.Name())
+	if err != nil {
+		log.Printf("Error checking if database exists: %v", err)
+		return fmt.Errorf("failed to check if database exists: %w", err)
+	}
+	if !exists {
+		log.Printf("Database %s does not exist, creating it", s.db.Name())
+		if err := s.client.CreateDB(ctx, s.db.Name()); err != nil {
+			log.Printf("Error creating database: %v", err)
+			return fmt.Errorf("failed to create database: %w", err)
+		}
+	}
+
+	// Create a simple document to test the database connection
+	testDoc := map[string]interface{}{
+		"_id":  "test-doc",
+		"type": "test",
+	}
+
+	// Try to put the test document
+	log.Printf("Testing database connection with a simple document")
+	_, err = s.db.Put(ctx, "test-doc", testDoc)
+	if err != nil && !strings.Contains(err.Error(), "conflict") {
+		log.Printf("Error testing database connection: %v", err)
+		return fmt.Errorf("failed to test database connection: %w", err)
+	}
+
+	// Convert the note to a map to ensure proper JSON serialization
+	noteMap := map[string]interface{}{
+		"_id":        note.ID,
+		"title":      note.Title,
+		"content":    note.Content,
+		"created_at": note.CreatedAt,
+		"updated_at": note.UpdatedAt,
+	}
+
 	// Put the note into CouchDB
 	// This creates a new document with the note's ID
-	_, err := s.db.Put(ctx, note.ID, note)
+	log.Printf("Putting note into CouchDB as a map: %v", noteMap)
+	_, err = s.db.Put(ctx, note.ID, noteMap)
 	if err != nil {
+		log.Printf("Error creating note in CouchDB: %v", err)
 		return fmt.Errorf("failed to create note: %w", err)
 	}
+	log.Printf("Successfully created note with ID: %s", note.ID)
 	return nil
 }
 

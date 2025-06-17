@@ -18,6 +18,19 @@ services:
       timeout: 5s
       retries: 5
 
+  # CouchDB initialization service
+  couchdb-init:
+    image: curlimages/curl:latest
+    container_name: couchdb-init
+    depends_on:
+      couchdb:
+        condition: service_healthy
+    volumes:
+      - ./init-couchdb.sh:/init-couchdb.sh
+    command: ["/bin/sh", "/init-couchdb.sh"]
+    networks:
+      - notes-network
+
   # Notes API service with CouchDB
   notes-api:
     build:
@@ -27,10 +40,13 @@ services:
     depends_on:
       couchdb:
         condition: service_healthy
+      couchdb-init:
+        condition: service_completed_successfully
     environment:
       - STORAGE_TYPE=couchdb
       - COUCHDB_URL=http://admin:password@couchdb:5984
       - COUCHDB_DB=notes
+      - DEBUG=true
     ports:
       - "8080:8080"
       - "8081:8081"

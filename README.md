@@ -66,6 +66,36 @@ The services will be available at:
 ### CouchDB Version
 - REST API: http://localhost:8080/api/notes
 - gRPC API: localhost:8081
+
+## Testing with Docker Compose
+
+A test script is provided to test Docker Compose configurations:
+
+```bash
+# Test all configurations
+./test_docker_compose.sh
+
+# Test only CouchDB configuration
+./test_docker_compose.sh couch
+
+# Test only MongoDB configuration
+./test_docker_compose.sh mongo
+```
+
+This script will:
+1. Start the selected Docker Compose configuration(s)
+2. Run tests against each configuration (CRUD operations)
+3. Shut down the containers after testing
+4. Report success/failure
+
+The script can test the following configurations:
+- In-memory storage (docker-compose.yml)
+- CouchDB storage (docker-compose.couchdb.yml)
+- MongoDB storage (docker-compose.mongodb.yml)
+
+If no argument is provided, all configurations will be tested. You can specify "couch" or "mongo" as an argument to test only that specific configuration.
+
+### CouchDB Version
 - CouchDB: http://localhost:5984 (admin:password)
 
 ### MongoDB Version

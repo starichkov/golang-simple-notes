@@ -12,6 +12,7 @@ type Config struct {
 	MongoDBCollection string
 	RESTPort          string
 	GRPCPort          string
+	Debug             bool
 }
 
 // NewConfig creates a new Config instance with values from environment variables
@@ -25,6 +26,7 @@ func NewConfig() *Config {
 		MongoDBCollection: getEnv("MONGODB_COLLECTION", "notes"),
 		RESTPort:          ":8080",
 		GRPCPort:          ":8081",
+		Debug:             getEnvBool("DEBUG", false),
 	}
 }
 

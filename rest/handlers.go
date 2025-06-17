@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"golang-simple-notes/model"
 	"golang-simple-notes/storage"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -143,9 +144,32 @@ func (h *Handler) createNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Add debug logging
+	log.Printf("Creating note with Title: %s, Content: %s", note.Title, note.Content)
+
+	// Log the request body
+	reqBody, _ := json.Marshal(note)
+	log.Printf("Request body: %s", string(reqBody))
+
+	// Create a new note with proper ID and timestamps
+	newNote := model.NewNote(note.Title, note.Content)
+	log.Printf("Generated new note with ID: %s", newNote.ID)
+
+	// Log the new note
+	noteJSON, _ := json.Marshal(newNote)
+	log.Printf("New note JSON: %s", string(noteJSON))
+
 	// Create the note in the storage
-	if err := h.storage.Create(r.Context(), &note); err != nil {
+	log.Printf("About to call storage.Create with note ID: %s", newNote.ID)
+	err := h.storage.Create(r.Context(), newNote)
+	if err != nil {
 		// If creation fails, return a 500 Internal Server Error
+		log.Printf("Failed to create note: %v", err)
+		// Print the type of storage being used
+		log.Printf("Storage type: %T", h.storage)
+		// Print the error details
+		log.Printf("Error type: %T", err)
+		log.Printf("Error details: %v", err)
 		http.Error(w, "Failed to create note", http.StatusInternalServerError)
 		return
 	}
@@ -157,11 +181,14 @@ func (h *Handler) createNote(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	// Encode the created note as JSON and write to the response
-	if err := json.NewEncoder(w).Encode(note); err != nil {
+	if err := json.NewEncoder(w).Encode(newNote); err != nil {
 		// If encoding fails, return a 500 Internal Server Error
+		log.Printf("Failed to encode note: %v", err)
 		http.Error(w, "Failed to encode note", http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("Successfully created note with ID: %s", newNote.ID)
 }
 
 // updateNote handles PUT /api/notes/{id}.
