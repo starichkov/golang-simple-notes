@@ -30,7 +30,7 @@ A simple microservice for notes management with REST and gRPC APIs, with support
 ## Prerequisites
 
 - Docker and Docker Compose
-- Go 1.24.3 or later (for local development)
+- Go 1.24.5 or later (for local development)
 
 ## Compilation
 
