@@ -1,20 +1,14 @@
 [![Author](https://img.shields.io/badge/Author-Vadim%20Starichkov-blue?style=for-the-badge)](https://github.com/starichkov)
+[![GitHub License](https://img.shields.io/github/license/starichkov/golang-simple-notes?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/blob/main/LICENSE.md)
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/starichkov/golang-simple-notes/build.yml?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/actions/workflows/build.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/starichkov/golang-simple-notes?style=for-the-badge)](https://codecov.io/gh/starichkov/golang-simple-notes)
-[![GitHub License](https://img.shields.io/github/license/starichkov/golang-simple-notes?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/blob/main/LICENSE.md)
 
 Notes API: Golang with NoSQL Databases
 =
 
 A simple microservice for notes management with REST and gRPC APIs, with support for multiple storage backends.
 
-**This project is generated using JetBrains Junie and several other AI coding agents, to evaluate agents capabilities.**
-
-## 👨‍💻 Author
-
-**Vadim Starichkov** | [GitHub](https://github.com/starichkov) | [LinkedIn](https://www.linkedin.com/in/vadim-starichkov/)
-
-*Developed to demonstrate modern Golang development practices and patterns*
+*This project is generated using JetBrains Junie and several other AI coding agents to evaluate agent capabilities.*
 
 ## Features
 
@@ -276,7 +270,7 @@ Additionally, code coverage reports are automatically uploaded to [Codecov](http
 The application can be configured using environment variables:
 
 ### General Configuration
-- `STORAGE_TYPE` - The type of storage to use: "memory", "couchdb", or "mongodb" (default: "memory")
+- `STORAGE_TYPE` - The type of storage to use: `memory`, `couchdb`, or `mongodb` (default: `memory`)
 
 ### CouchDB Configuration
 - `COUCHDB_URL` - The URL of the CouchDB server (default: "http://localhost:5984")
@@ -294,7 +288,7 @@ All code is released under open-source licenses. Ownership may be transferred to
 
 ## 📄 License & Attribution
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE.md) file for details.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE.md) file for details.
 
 ### Using This Project?
 
