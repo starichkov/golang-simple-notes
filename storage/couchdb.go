@@ -5,6 +5,8 @@ package storage
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,7 +54,12 @@ func NewCouchDBStorage(url, dbName string) (*CouchDBStorage, error) {
 	// Try to connect to CouchDB with retries
 	// This is useful when starting the application with Docker Compose,
 	// as CouchDB might not be immediately available
+	// Allow retry behavior to be tuned via environment variables to speed up tests
 	maxAttempts := 10
+	if v := getenvInt("COUCHDB_MAX_ATTEMPTS", 10); v > 0 {
+		maxAttempts = v
+	}
+	retryDelay := time.Duration(getenvInt("COUCHDB_RETRY_DELAY_MS", 2000)) * time.Millisecond
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		// Create a new Kivik client for CouchDB
 		client, err = kivik.New("couch", url)
@@ -64,7 +71,7 @@ func NewCouchDBStorage(url, dbName string) (*CouchDBStorage, error) {
 			}
 		}
 		// Wait before retrying
-		time.Sleep(2 * time.Second)
+		time.Sleep(retryDelay)
 	}
 
 	// If we still have an error after all retries, return it
@@ -260,3 +267,16 @@ func (s *CouchDBStorage) Close(context.Context) error {
 	// CouchDB client doesn't need explicit closing
 	return nil
 }
+
+// getenvInt returns the integer value of the environment variable key, or def if not set or invalid.
+func getenvInt(key string, def int) int {
+	if v := strings.TrimSpace(getenv(key)); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
+// getenv is a tiny wrapper around os.Getenv to avoid importing it at top-level unnecessarily.
+func getenv(key string) string { return os.Getenv(key) }

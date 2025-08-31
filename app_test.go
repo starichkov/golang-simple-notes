@@ -294,6 +294,10 @@ func TestApp_WaitForShutdown(t *testing.T) {
 
 // TestApp_StorageFallback tests the fallback to in-memory storage when CouchDB/MongoDB fails
 func TestApp_StorageFallback(t *testing.T) {
+	// Speed up failure paths by reducing retry/timeout for external DB clients
+	t.Setenv("COUCHDB_MAX_ATTEMPTS", "1")
+	t.Setenv("COUCHDB_RETRY_DELAY_MS", "100")
+	t.Setenv("MONGODB_CONNECT_TIMEOUT_MS", "500")
 	testCases := []struct {
 		name        string
 		config      *Config
@@ -612,6 +616,10 @@ func TestApp_IsDuplicateKeyError(t *testing.T) {
 }
 
 func TestApp_InitializeStorageError(t *testing.T) {
+	// Speed up failure paths by reducing retry/timeout for external DB clients
+	t.Setenv("COUCHDB_MAX_ATTEMPTS", "1")
+	t.Setenv("COUCHDB_RETRY_DELAY_MS", "100")
+	t.Setenv("MONGODB_CONNECT_TIMEOUT_MS", "500")
 	testCases := []struct {
 		name        string
 		storageType string

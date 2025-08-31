@@ -37,8 +37,9 @@ type MongoDBStorage struct {
 //   - A pointer to a new MongoDBStorage instance
 //   - An error if the connection fails
 func NewMongoDBStorage(uri, dbName, collectionName string) (*MongoDBStorage, error) {
-	// Create a context with a 10-second timeout for the connection
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Create a context with a timeout for the connection (configurable via env)
+	mongoTimeoutMs := getenvInt("MONGODB_CONNECT_TIMEOUT_MS", 10000)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mongoTimeoutMs)*time.Millisecond)
 	defer cancel() // Ensure the context is canceled when the function returns
 
 	// Connect to MongoDB using the provided URI
