@@ -37,7 +37,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
   docker-compose-test-mongodb:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     needs: build
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +70,7 @@ jobs:
         run: docker compose -f docker-compose.mongodb.yml down
 
   docker-compose-test-couchdb:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     needs: build
     steps:
       - uses: actions/checkout@v4
@@ -103,7 +103,7 @@ jobs:
         run: docker compose -f docker-compose.couchdb.yml down
 
   docker-compose-test-memory:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     needs: build
     steps:
       - uses: actions/checkout@v4
