@@ -1,7 +1,7 @@
 services:
   # MongoDB service
   mongodb:
-    image: mongo:7.0.21-jammy
+    image: mongo:7.0.23-jammy
     container_name: notes-mongodb
     environment:
       - MONGO_INITDB_ROOT_USERNAME=admin

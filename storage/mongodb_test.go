@@ -27,7 +27,7 @@ func TestMongoDBStorage(t *testing.T) {
 
 	// Start MongoDB container
 	mongodbContainer, err := mongodb.Run(ctx,
-		"mongo:7.0.21-jammy",
+		"mongo:7.0.23-jammy",
 		mongodb.WithUsername("admin"),
 		mongodb.WithPassword("password"),
 	)
@@ -189,7 +189,7 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 
 	// Define the MongoDB container request
 	req := testcontainers.ContainerRequest{
-		Image:        "mongo:7.0.21-jammy",
+		Image:        "mongo:7.0.23-jammy",
 		ExposedPorts: []string{"27017/tcp"},
 		WaitingFor:   wait.ForLog("Waiting for connections"),
 		Env: map[string]string{

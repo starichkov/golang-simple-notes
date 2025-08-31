@@ -130,7 +130,7 @@ To use MongoDB, you need to have MongoDB running. You can start MongoDB using Do
 docker run -d -p 27017:27017 --name mongodb \
   -e MONGO_INITDB_ROOT_USERNAME=admin \
   -e MONGO_INITDB_ROOT_PASSWORD=password \
-  mongo:7.0.21-jammy
+  mongo:7.0.23-jammy
 ```
 
 Then, set the environment variables and run the application:
