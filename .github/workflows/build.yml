@@ -1,5 +1,9 @@
 name: Build and Test
 
+env:
+  GO_LATEST: '1.24.6'
+  DOCKER_COMPOSE_VERSION: 'v2.24.7'
+
 on:
   push:
     branches: [ main ]
@@ -9,13 +13,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [ '1.21.x', '1.22.x', '1.23.x', '1.24.6' ]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
+      - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.6'
+          go-version: ${{ matrix.go-version }}
           check-latest: true
           cache: true
 
@@ -32,6 +40,7 @@ jobs:
         run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
+        if: matrix.go-version == env.GO_LATEST
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -39,8 +48,16 @@ jobs:
   docker-compose-test-mongodb:
     runs-on: ubuntu-22.04
     needs: build
+    if: ${{ always() && contains(needs.build.result, 'success') }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Go ${{ env.GO_LATEST }} (latest)
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_LATEST }}
+          check-latest: true
+          cache: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -50,7 +67,7 @@ jobs:
           sudo apt-get update
           DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
           mkdir -p $DOCKER_CONFIG/cli-plugins
-          curl -SL https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+          curl -SL https://github.com/docker/compose/releases/download/${{ env.DOCKER_COMPOSE_VERSION }}/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
           chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
           docker compose version
 
@@ -72,8 +89,16 @@ jobs:
   docker-compose-test-couchdb:
     runs-on: ubuntu-22.04
     needs: build
+    if: ${{ always() && contains(needs.build.result, 'success') }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Go ${{ env.GO_LATEST }} (latest)
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_LATEST }}
+          check-latest: true
+          cache: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -83,7 +108,7 @@ jobs:
           sudo apt-get update
           DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
           mkdir -p $DOCKER_CONFIG/cli-plugins
-          curl -SL https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+          curl -SL https://github.com/docker/compose/releases/download/${{ env.DOCKER_COMPOSE_VERSION }}/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
           chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
           docker compose version
 
@@ -105,8 +130,16 @@ jobs:
   docker-compose-test-memory:
     runs-on: ubuntu-22.04
     needs: build
+    if: ${{ always() && contains(needs.build.result, 'success') }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Go ${{ env.GO_LATEST }} (latest)
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_LATEST }}
+          check-latest: true
+          cache: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -116,7 +149,7 @@ jobs:
           sudo apt-get update
           DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
           mkdir -p $DOCKER_CONFIG/cli-plugins
-          curl -SL https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+          curl -SL https://github.com/docker/compose/releases/download/${{ env.DOCKER_COMPOSE_VERSION }}/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
           chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
           docker compose version
 
