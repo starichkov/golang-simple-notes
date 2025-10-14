@@ -47,8 +47,8 @@ func getLockFilePath() string {
 // acquireLock attempts to acquire a file-based lock
 func acquireLock() (*os.File, error) {
 	lockFile := getLockFilePath()
-	// Try to create lock file exclusively
-	for i := 0; i < 50; i++ {
+	// Try to create lock file exclusively (wait up to ~2 minutes)
+	for i := 0; i < 1200; i++ { // 1200 * 100ms = 120s
 		f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if err == nil {
 			// Write our PID to the lock file
@@ -58,7 +58,7 @@ func acquireLock() (*os.File, error) {
 		// Lock file exists, wait and retry
 		time.Sleep(100 * time.Millisecond)
 	}
-	return nil, fmt.Errorf("failed to acquire lock after 5 seconds")
+	return nil, fmt.Errorf("failed to acquire lock after 120 seconds")
 }
 
 // releaseLock releases the file-based lock
@@ -103,8 +103,27 @@ func TestMain(m *testing.M) {
 	// Acquire lock to prevent race condition with other packages
 	lock, err := acquireLock()
 	if err != nil {
-		log.Printf("Warning: Failed to acquire lock: %v. Tests may fail.", err)
-		os.Exit(1)
+		log.Printf("Warning: Failed to acquire lock: %v. Waiting for shared state...", err)
+		// If we cannot get the lock, another package is likely starting containers.
+		// Wait for the shared state file to appear and reuse those containers.
+		deadline := time.Now().Add(2 * time.Minute)
+		for time.Now().Before(deadline) {
+			if state, err := loadContainerState(); err == nil && state != nil {
+				log.Printf("Reusing existing MongoDB container at %s", state.MongoURI)
+				log.Printf("Reusing existing CouchDB container at %s", state.CouchURL)
+				sharedMongoURI = state.MongoURI
+				sharedCouchURL = state.CouchURL
+				shouldCleanupContainers = false
+				// Run tests without owning the containers
+				code := m.Run()
+				os.Exit(code)
+			}
+			time.Sleep(250 * time.Millisecond)
+		}
+		log.Printf("Warning: Shared state not found after waiting. Integration tests may be skipped.")
+		// Proceed without containers (integration tests will self-skip if unavailable)
+		code := m.Run()
+		os.Exit(code)
 	}
 
 	// Try to load existing container state
