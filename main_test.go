@@ -174,7 +174,7 @@ func TestMain(m *testing.M) {
 }
 
 func startSharedMongoDBContainer(ctx context.Context) error {
-	container, err := mongodb.RunContainer(ctx, testcontainers.WithImage("mongo:7.0.23-jammy"))
+	container, err := mongodb.RunContainer(ctx, testcontainers.WithImage("mongo:7.0.25-jammy"))
 	if err != nil {
 		return fmt.Errorf("failed to start MongoDB container: %w", err)
 	}

@@ -175,7 +175,7 @@ func TestMain(m *testing.M) {
 
 func startSharedMongoDBContainer(ctx context.Context) error {
 	container, err := mongodb.Run(ctx,
-		"mongo:7.0.23-jammy",
+		"mongo:7.0.25-jammy",
 		mongodb.WithUsername("admin"),
 		mongodb.WithPassword("password"),
 	)
