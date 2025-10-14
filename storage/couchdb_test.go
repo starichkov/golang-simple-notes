@@ -8,14 +8,12 @@ import (
 	"time"
 
 	"github.com/go-kivik/kivik/v4"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 
 	"golang-simple-notes/model"
 )
 
 // TestCouchDBStorage tests the CouchDB storage implementation
-// This test uses Testcontainers to start a CouchDB container
+// This test uses the shared CouchDB container from TestMain
 func TestCouchDBStorage(t *testing.T) {
 	// Skip this test if we're not running integration tests
 	if testing.Short() {
@@ -26,48 +24,11 @@ func TestCouchDBStorage(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Define the CouchDB container request
-	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.4.3",
-		ExposedPorts: []string{"5984/tcp"},
-		Env: map[string]string{
-			"COUCHDB_USER":     "admin",
-			"COUCHDB_PASSWORD": "password",
-		},
-		WaitingFor: wait.ForHTTP("/").WithPort("5984/tcp"),
+	// Use the shared CouchDB container
+	url := getSharedCouchURL()
+	if url == "" {
+		t.Skip("Shared CouchDB container not available")
 	}
-
-	// Start the CouchDB container
-	couchdbContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		t.Fatalf("Failed to start CouchDB container: %v", err)
-	}
-
-	// Make sure to terminate the container at the end of the test
-	defer func() {
-		termCtx, termCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer termCancel()
-		if err := couchdbContainer.Terminate(termCtx); err != nil {
-			t.Logf("Failed to terminate CouchDB container: %v", err)
-		}
-	}()
-
-	// Get the container's host and port
-	host, err := couchdbContainer.Host(ctx)
-	if err != nil {
-		t.Fatalf("Failed to get CouchDB container host: %v", err)
-	}
-
-	port, err := couchdbContainer.MappedPort(ctx, "5984/tcp")
-	if err != nil {
-		t.Fatalf("Failed to get CouchDB container port: %v", err)
-	}
-
-	// Construct the CouchDB URL
-	url := fmt.Sprintf("http://admin:password@%s:%s", host, port.Port())
 	dbName := "test_notes"
 
 	// Connect to the CouchDB container
@@ -206,48 +167,11 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Define the CouchDB container request
-	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.4.3",
-		ExposedPorts: []string{"5984/tcp"},
-		Env: map[string]string{
-			"COUCHDB_USER":     "admin",
-			"COUCHDB_PASSWORD": "password",
-		},
-		WaitingFor: wait.ForHTTP("/").WithPort("5984/tcp"),
+	// Use the shared CouchDB container
+	url := getSharedCouchURL()
+	if url == "" {
+		t.Skip("Shared CouchDB container not available")
 	}
-
-	// Start the CouchDB container
-	couchdbContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		t.Fatalf("Failed to start CouchDB container: %v", err)
-	}
-
-	// Make sure to terminate the container at the end of the test
-	defer func() {
-		termCtx, termCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer termCancel()
-		if err := couchdbContainer.Terminate(termCtx); err != nil {
-			t.Logf("Failed to terminate CouchDB container: %v", err)
-		}
-	}()
-
-	// Get the container's host and port
-	host, err := couchdbContainer.Host(ctx)
-	if err != nil {
-		t.Fatalf("Failed to get CouchDB container host: %v", err)
-	}
-
-	port, err := couchdbContainer.MappedPort(ctx, "5984/tcp")
-	if err != nil {
-		t.Fatalf("Failed to get CouchDB container port: %v", err)
-	}
-
-	// Construct the CouchDB URL
-	url := fmt.Sprintf("http://admin:password@%s:%s", host, port.Port())
 	dbName := "test_notes_specific"
 
 	// Connect to the CouchDB container

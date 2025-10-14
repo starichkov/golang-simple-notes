@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"context"
@@ -10,20 +10,18 @@ import (
 	"testing"
 	"time"
 
-	"golang-simple-notes/model"
-	"golang-simple-notes/storage"
-
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 var (
-	// Shared container instances for all tests in the main package
+	// Shared container instances for all tests in the storage package
 	sharedMongoContainer    testcontainers.Container
 	sharedMongoURI          string
 	sharedCouchContainer    testcontainers.Container
 	sharedCouchURL          string
+	containersInitialized   bool
 	shouldCleanupContainers bool
 )
 
@@ -96,7 +94,7 @@ func saveContainerState(state *containerState) error {
 	return os.WriteFile(stateFile, data, 0644)
 }
 
-// TestMain sets up shared test containers for the main package
+// TestMain sets up shared test containers for the storage package
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
@@ -146,6 +144,8 @@ func TestMain(m *testing.M) {
 		releaseLock(lock)
 	}
 
+	containersInitialized = true
+
 	// Run tests
 	code := m.Run()
 
@@ -174,20 +174,29 @@ func TestMain(m *testing.M) {
 }
 
 func startSharedMongoDBContainer(ctx context.Context) error {
-	container, err := mongodb.RunContainer(ctx, testcontainers.WithImage("mongo:7.0.23-jammy"))
+	container, err := mongodb.Run(ctx,
+		"mongo:7.0.23-jammy",
+		mongodb.WithUsername("admin"),
+		mongodb.WithPassword("password"),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to start MongoDB container: %w", err)
 	}
 
 	sharedMongoContainer = container
 
-	// Get connection string
-	mongoURI, err := container.ConnectionString(ctx)
+	// Get connection details
+	host, err := container.Host(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get MongoDB connection string: %w", err)
+		return fmt.Errorf("failed to get MongoDB container host: %w", err)
 	}
 
-	sharedMongoURI = mongoURI
+	port, err := container.MappedPort(ctx, "27017/tcp")
+	if err != nil {
+		return fmt.Errorf("failed to get MongoDB container port: %w", err)
+	}
+
+	sharedMongoURI = fmt.Sprintf("mongodb://admin:password@%s:%s", host, port.Port())
 
 	log.Printf("Started shared MongoDB container at %s", sharedMongoURI)
 	return nil
@@ -197,11 +206,11 @@ func startSharedCouchDBContainer(ctx context.Context) error {
 	req := testcontainers.ContainerRequest{
 		Image:        "couchdb:3.4.3",
 		ExposedPorts: []string{"5984/tcp"},
-		WaitingFor:   wait.ForListeningPort("5984/tcp"),
 		Env: map[string]string{
 			"COUCHDB_USER":     "admin",
 			"COUCHDB_PASSWORD": "password",
 		},
+		WaitingFor: wait.ForHTTP("/").WithPort("5984/tcp"),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -220,7 +229,7 @@ func startSharedCouchDBContainer(ctx context.Context) error {
 		return fmt.Errorf("failed to get CouchDB container host: %w", err)
 	}
 
-	port, err := container.MappedPort(ctx, "5984")
+	port, err := container.MappedPort(ctx, "5984/tcp")
 	if err != nil {
 		return fmt.Errorf("failed to get CouchDB container port: %w", err)
 	}
@@ -231,126 +240,12 @@ func startSharedCouchDBContainer(ctx context.Context) error {
 	return nil
 }
 
-// MockStorage is a simple implementation of NoteStorage for testing
-type MockStorage struct {
-	notes []*model.Note
+// getSharedMongoURI returns the shared MongoDB connection URI
+func getSharedMongoURI() string {
+	return sharedMongoURI
 }
 
-func NewMockStorage() *MockStorage {
-	return &MockStorage{
-		notes: make([]*model.Note, 0),
-	}
-}
-
-func (s *MockStorage) Create(ctx context.Context, note *model.Note) error {
-	s.notes = append(s.notes, note)
-	return nil
-}
-
-func (s *MockStorage) Get(ctx context.Context, id string) (*model.Note, error) {
-	for _, note := range s.notes {
-		if note.ID == id {
-			return note, nil
-		}
-	}
-	return nil, storage.ErrNoteNotFound
-}
-
-func (s *MockStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
-	return s.notes, nil
-}
-
-func (s *MockStorage) Update(ctx context.Context, note *model.Note) error {
-	for i, n := range s.notes {
-		if n.ID == note.ID {
-			s.notes[i] = note
-			return nil
-		}
-	}
-	return storage.ErrNoteNotFound
-}
-
-func (s *MockStorage) Delete(ctx context.Context, id string) error {
-	for i, note := range s.notes {
-		if note.ID == id {
-			s.notes = append(s.notes[:i], s.notes[i+1:]...)
-			return nil
-		}
-	}
-	return storage.ErrNoteNotFound
-}
-
-func (s *MockStorage) Close(ctx context.Context) error {
-	return nil
-}
-
-// ErrorMockStorage is a mock storage that returns an error on Create
-type ErrorMockStorage struct{}
-
-func (s *ErrorMockStorage) Create(ctx context.Context, note *model.Note) error {
-	return fmt.Errorf("mock error")
-}
-
-func (s *ErrorMockStorage) Get(ctx context.Context, id string) (*model.Note, error) {
-	return nil, storage.ErrNoteNotFound
-}
-
-func (s *ErrorMockStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
-	return nil, nil
-}
-
-func (s *ErrorMockStorage) Update(ctx context.Context, note *model.Note) error {
-	return storage.ErrNoteNotFound
-}
-
-func (s *ErrorMockStorage) Delete(ctx context.Context, id string) error {
-	return storage.ErrNoteNotFound
-}
-
-func (s *ErrorMockStorage) Close(ctx context.Context) error {
-	return nil
-}
-
-type MyLogConsumer struct{}
-
-func (c *MyLogConsumer) Accept(log testcontainers.Log) {
-	fmt.Printf("Log: %s\n", string(log.Content))
-}
-
-// startCouchDBContainer starts a CouchDB container and returns the container and connection URL
-func startCouchDBContainer(ctx context.Context) (testcontainers.Container, string, error) {
-	consumer := &MyLogConsumer{}
-	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.4.3",
-		ExposedPorts: []string{"5984/tcp"},
-		WaitingFor:   wait.ForListeningPort("5984/tcp"),
-		Env: map[string]string{
-			"COUCHDB_USER":     "admin",
-			"COUCHDB_PASSWORD": "password",
-		},
-		LogConsumerCfg: &testcontainers.LogConsumerConfig{
-			Consumers: []testcontainers.LogConsumer{
-				consumer,
-			},
-		},
-	}
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		return nil, "", err
-	}
-	host, err := container.Host(ctx)
-	if err != nil {
-		container.Terminate(ctx)
-		return nil, "", err
-	}
-	port, err := container.MappedPort(ctx, "5984")
-	if err != nil {
-		container.Terminate(ctx)
-		return nil, "", err
-	}
-	url := fmt.Sprintf("http://admin:password@%s:%s", host, port.Port())
-	return container, url, nil
+// getSharedCouchURL returns the shared CouchDB connection URL
+func getSharedCouchURL() string {
+	return sharedCouchURL
 }

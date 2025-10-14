@@ -10,8 +10,6 @@ import (
 	"golang-simple-notes/model"
 	"golang-simple-notes/storage"
 
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/mongodb"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -47,18 +45,16 @@ func TestApp_Initialize(t *testing.T) {
 func TestApp_InitializeWithCouchDB(t *testing.T) {
 	ctx := context.Background()
 
-	// Start CouchDB container
-	couchContainer, couchURL, err := startCouchDBContainer(ctx)
-	if err != nil {
-		t.Fatalf("Failed to start CouchDB container: %v", err)
+	// Use the shared CouchDB container
+	couchURL := sharedCouchURL
+	if couchURL == "" {
+		t.Skip("Shared CouchDB container not available")
 	}
+
 	defer func() {
 		// Clean up: delete the notes database
 		req, _ := http.NewRequest(http.MethodDelete, couchURL+"/notes", nil)
 		http.DefaultClient.Do(req)
-		if err := couchContainer.Terminate(ctx); err != nil {
-			t.Fatalf("Failed to terminate CouchDB container: %v", err)
-		}
 	}()
 
 	// Create app with CouchDB config
@@ -71,7 +67,7 @@ func TestApp_InitializeWithCouchDB(t *testing.T) {
 	}
 
 	app := NewApp(config)
-	err = app.Initialize(ctx)
+	err := app.Initialize(ctx)
 	if err != nil {
 		t.Fatalf("Failed to initialize app: %v", err)
 	}
@@ -118,29 +114,20 @@ func TestApp_InitializeWithCouchDB(t *testing.T) {
 func TestApp_InitializeWithMongoDB(t *testing.T) {
 	ctx := context.Background()
 
-	// Start MongoDB container
-	mongoContainer, err := mongodb.RunContainer(ctx, testcontainers.WithImage("mongo:7.0.23-jammy"))
-	if err != nil {
-		t.Fatalf("Failed to start MongoDB container: %v", err)
+	// Use the shared MongoDB container
+	mongoURI := sharedMongoURI
+	if mongoURI == "" {
+		t.Skip("Shared MongoDB container not available")
 	}
+
 	defer func() {
 		// Clean up: drop the notes collection
-		mongoURI, _ := mongoContainer.ConnectionString(ctx)
 		client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 		if err == nil {
 			_ = client.Database("notes").Collection("notes").Drop(ctx)
 			_ = client.Disconnect(ctx)
 		}
-		if err := mongoContainer.Terminate(ctx); err != nil {
-			t.Fatalf("Failed to terminate MongoDB container: %v", err)
-		}
 	}()
-
-	// Get MongoDB connection details
-	mongoURI, err := mongoContainer.ConnectionString(ctx)
-	if err != nil {
-		t.Fatalf("Failed to get MongoDB connection string: %v", err)
-	}
 
 	// Create app with MongoDB config
 	config := &Config{
@@ -153,7 +140,7 @@ func TestApp_InitializeWithMongoDB(t *testing.T) {
 	}
 
 	app := NewApp(config)
-	err = app.Initialize(ctx)
+	err := app.Initialize(ctx)
 	if err != nil {
 		t.Fatalf("Failed to initialize app: %v", err)
 	}

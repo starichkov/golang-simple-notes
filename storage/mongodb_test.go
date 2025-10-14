@@ -6,9 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/mongodb"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -16,7 +13,7 @@ import (
 )
 
 // TestMongoDBStorage tests the MongoDB storage implementation
-// This test uses Testcontainers to start a MongoDB container
+// This test uses the shared MongoDB container from TestMain
 func TestMongoDBStorage(t *testing.T) {
 	// Skip this test if we're not running integration tests
 	if testing.Short() {
@@ -25,36 +22,11 @@ func TestMongoDBStorage(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Start MongoDB container
-	mongodbContainer, err := mongodb.Run(ctx,
-		"mongo:7.0.23-jammy",
-		mongodb.WithUsername("admin"),
-		mongodb.WithPassword("password"),
-	)
-	if err != nil {
-		t.Fatalf("Failed to start MongoDB container: %v", err)
+	// Use the shared MongoDB container
+	mongodbEndpoint := getSharedMongoURI()
+	if mongodbEndpoint == "" {
+		t.Skip("Shared MongoDB container not available")
 	}
-
-	// Make sure to terminate the container at the end of the test
-	defer func() {
-		if err := testcontainers.TerminateContainer(mongodbContainer); err != nil {
-			t.Logf("Failed to terminate MongoDB container: %v", err)
-		}
-	}()
-
-	// Get connection details
-	host, err := mongodbContainer.Host(ctx)
-	if err != nil {
-		t.Fatalf("Failed to get MongoDB container host: %v", err)
-	}
-
-	port, err := mongodbContainer.MappedPort(ctx, "27017/tcp")
-	if err != nil {
-		t.Fatalf("Failed to get MongoDB container port: %v", err)
-	}
-
-	// Construct the MongoDB connection string
-	mongodbEndpoint := fmt.Sprintf("mongodb://admin:password@%s:%s", host, port.Port())
 
 	// Add database and collection names to the URI
 	dbName := "test_notes"
@@ -187,48 +159,11 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Define the MongoDB container request
-	req := testcontainers.ContainerRequest{
-		Image:        "mongo:7.0.23-jammy",
-		ExposedPorts: []string{"27017/tcp"},
-		WaitingFor:   wait.ForLog("Waiting for connections"),
-		Env: map[string]string{
-			"MONGO_INITDB_ROOT_USERNAME": "admin",
-			"MONGO_INITDB_ROOT_PASSWORD": "password",
-		},
+	// Use the shared MongoDB container
+	mongodbEndpoint := getSharedMongoURI()
+	if mongodbEndpoint == "" {
+		t.Skip("Shared MongoDB container not available")
 	}
-
-	// Start the MongoDB container
-	mongoContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		t.Fatalf("Failed to start MongoDB container: %v", err)
-	}
-
-	// Make sure to terminate the container at the end of the test
-	defer func() {
-		termCtx, termCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer termCancel()
-		if err := mongoContainer.Terminate(termCtx); err != nil {
-			t.Logf("Failed to terminate MongoDB container: %v", err)
-		}
-	}()
-
-	// Get connection details
-	host, err := mongoContainer.Host(ctx)
-	if err != nil {
-		t.Fatalf("Failed to get MongoDB container host: %v", err)
-	}
-
-	port, err := mongoContainer.MappedPort(ctx, "27017/tcp")
-	if err != nil {
-		t.Fatalf("Failed to get MongoDB container port: %v", err)
-	}
-
-	// Construct the MongoDB connection string with authentication
-	mongodbEndpoint := fmt.Sprintf("mongodb://admin:password@%s:%s", host, port.Port())
 
 	// Add database and collection names to the URI
 	dbName := "test_notes"
