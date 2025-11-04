@@ -1,8 +1,8 @@
 name: Build and Test
 
 env:
-  GO_LATEST: '1.24.9'
-  DOCKER_COMPOSE_VERSION: 'v2.39.4'
+  GO_LATEST: '1.25.3'
+  DOCKER_COMPOSE_VERSION: 'v2.40.3'
 
 on:
   push:

@@ -1,5 +1,6 @@
 [![Author](https://img.shields.io/badge/Author-Vadim%20Starichkov-blue?style=for-the-badge)](https://github.com/starichkov)
 [![GitHub License](https://img.shields.io/github/license/starichkov/golang-simple-notes?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/blob/main/LICENSE.md)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/starichkov/golang-simple-notes?style=for-the-badge)
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/starichkov/golang-simple-notes/build.yml?style=for-the-badge)](https://github.com/starichkov/golang-simple-notes/actions/workflows/build.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/starichkov/golang-simple-notes?style=for-the-badge)](https://codecov.io/gh/starichkov/golang-simple-notes)
 
@@ -24,7 +25,7 @@ A simple microservice for notes management with REST and gRPC APIs, with support
 ## Prerequisites
 
 - Docker and Docker Compose
-- Go 1.24 or later (for local development)
+- Go 1.21 or later (for local development)
 
 ## Compilation
 
