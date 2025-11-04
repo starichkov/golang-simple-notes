@@ -51,6 +51,7 @@ jobs:
         run: go test -v -short ./...
 
       - name: Run integration tests with coverage
+        if: matrix.go-version == env.GO_LATEST
         run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
