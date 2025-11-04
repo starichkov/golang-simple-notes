@@ -52,7 +52,10 @@ func acquireLock() (*os.File, error) {
 		f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if err == nil {
 			// Write our PID to the lock file
-			fmt.Fprintf(f, "%d", os.Getpid())
+			_, errF := fmt.Fprintf(f, "%d", os.Getpid())
+			if errF != nil {
+				return nil, errF
+			}
 			return f, nil
 		}
 		// Lock file exists, wait and retry
@@ -64,8 +67,14 @@ func acquireLock() (*os.File, error) {
 // releaseLock releases the file-based lock
 func releaseLock(f *os.File) {
 	if f != nil {
-		f.Close()
-		os.Remove(getLockFilePath())
+		errC := f.Close()
+		if errC != nil {
+			return
+		}
+		errR := os.Remove(getLockFilePath())
+		if errR != nil {
+			return
+		}
 	}
 }
 
@@ -186,14 +195,17 @@ func TestMain(m *testing.M) {
 		}
 
 		// Clean up state file
-		os.Remove(getStateFilePath())
+		errR := os.Remove(getStateFilePath())
+		if errR != nil {
+			return
+		}
 	}
 
 	os.Exit(code)
 }
 
 func startSharedMongoDBContainer(ctx context.Context) error {
-	container, err := mongodb.RunContainer(ctx, testcontainers.WithImage("mongo:7.0.25-jammy"))
+	container, err := mongodb.Run(ctx, "mongo:7.0.25-jammy")
 	if err != nil {
 		return fmt.Errorf("failed to start MongoDB container: %w", err)
 	}
@@ -334,42 +346,4 @@ type MyLogConsumer struct{}
 
 func (c *MyLogConsumer) Accept(log testcontainers.Log) {
 	fmt.Printf("Log: %s\n", string(log.Content))
-}
-
-// startCouchDBContainer starts a CouchDB container and returns the container and connection URL
-func startCouchDBContainer(ctx context.Context) (testcontainers.Container, string, error) {
-	consumer := &MyLogConsumer{}
-	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.4.3",
-		ExposedPorts: []string{"5984/tcp"},
-		WaitingFor:   wait.ForListeningPort("5984/tcp"),
-		Env: map[string]string{
-			"COUCHDB_USER":     "admin",
-			"COUCHDB_PASSWORD": "password",
-		},
-		LogConsumerCfg: &testcontainers.LogConsumerConfig{
-			Consumers: []testcontainers.LogConsumer{
-				consumer,
-			},
-		},
-	}
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		return nil, "", err
-	}
-	host, err := container.Host(ctx)
-	if err != nil {
-		container.Terminate(ctx)
-		return nil, "", err
-	}
-	port, err := container.MappedPort(ctx, "5984")
-	if err != nil {
-		container.Terminate(ctx)
-		return nil, "", err
-	}
-	url := fmt.Sprintf("http://admin:password@%s:%s", host, port.Port())
-	return container, url, nil
 }

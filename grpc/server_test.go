@@ -147,7 +147,12 @@ func TestStartError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create listener for test: %v", err)
 	}
-	defer listener.Close()
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+			t.Errorf("Failed to close listener: %v", err)
+		}
+	}(listener)
 
 	// Now try to start a server on the same port, which should fail
 	server := NewServer(mockStorage, 8082)
@@ -201,7 +206,10 @@ func TestGetNote(t *testing.T) {
 
 	// Create a note
 	originalNote := model.NewNote("Test Title", "Test Content")
-	mockStorage.Create(ctx, originalNote)
+	err := mockStorage.Create(ctx, originalNote)
+	if err != nil {
+		return
+	}
 
 	// Test getting an existing note
 	note, err := server.GetNote(ctx, originalNote.ID)
@@ -237,8 +245,14 @@ func TestGetAllNotes(t *testing.T) {
 	// Create some notes
 	note1 := model.NewNote("Title 1", "Content 1")
 	note2 := model.NewNote("Title 2", "Content 2")
-	mockStorage.Create(ctx, note1)
-	mockStorage.Create(ctx, note2)
+	err1 := mockStorage.Create(ctx, note1)
+	if err1 != nil {
+		return
+	}
+	err2 := mockStorage.Create(ctx, note2)
+	if err2 != nil {
+		return
+	}
 
 	// Get all notes
 	notes, err := server.GetAllNotes(ctx)
@@ -274,7 +288,10 @@ func TestUpdateNote(t *testing.T) {
 
 	// Create a note
 	originalNote := model.NewNote("Original Title", "Original Content")
-	mockStorage.Create(ctx, originalNote)
+	err := mockStorage.Create(ctx, originalNote)
+	if err != nil {
+		return
+	}
 
 	// Update the note
 	updatedNote, err := server.UpdateNote(ctx, originalNote.ID, "Updated Title", "Updated Content")
@@ -313,7 +330,10 @@ func TestDeleteNote(t *testing.T) {
 
 	// Create a note
 	note := model.NewNote("Test Title", "Test Content")
-	mockStorage.Create(ctx, note)
+	errc := mockStorage.Create(ctx, note)
+	if errc != nil {
+		return
+	}
 
 	// Delete the note
 	err := server.DeleteNote(ctx, note.ID)

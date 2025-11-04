@@ -102,7 +102,7 @@ func (s *MongoDBStorage) GetAll(ctx context.Context) ([]*model.Note, error) {
 		return nil, fmt.Errorf("failed to find notes: %w", err)
 	}
 	// Ensure the cursor is closed when the function returns
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 
 	// Decode all documents into a slice of Note pointers
 	var notes []*model.Note

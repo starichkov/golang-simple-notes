@@ -33,6 +33,20 @@ jobs:
       - name: Build
         run: go build -v ./...
 
+      - name: Check formatting (gofmt)
+        run: |
+          fmtres=$(gofmt -l .)
+          if [ -n "$fmtres" ]; then
+          echo "These files are not gofmt'ed:"
+          echo "$fmtres"
+          exit 1
+          fi
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.6
+
       - name: Run unit tests
         run: go test -v -short ./...
 

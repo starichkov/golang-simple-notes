@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"testing"
 )
 
@@ -35,12 +34,12 @@ func TestNewConfig(t *testing.T) {
 	}
 
 	// Test environment variable override
-	os.Setenv("STORAGE_TYPE", "couchdb")
-	os.Setenv("COUCHDB_URL", "http://test:5984")
-	os.Setenv("COUCHDB_DB", "testdb")
-	os.Setenv("MONGODB_URI", "mongodb://test:27017")
-	os.Setenv("MONGODB_DB", "testdb")
-	os.Setenv("MONGODB_COLLECTION", "testcoll")
+	t.Setenv("STORAGE_TYPE", "couchdb")
+	t.Setenv("COUCHDB_URL", "http://test:5984")
+	t.Setenv("COUCHDB_DB", "testdb")
+	t.Setenv("MONGODB_URI", "mongodb://test:27017")
+	t.Setenv("MONGODB_DB", "testdb")
+	t.Setenv("MONGODB_COLLECTION", "testcoll")
 
 	config = NewConfig()
 	if config.StorageType != "couchdb" {
@@ -62,13 +61,6 @@ func TestNewConfig(t *testing.T) {
 		t.Errorf("Expected MongoDBCollection to be 'testcoll', got %s", config.MongoDBCollection)
 	}
 
-	// Clean up environment variables
-	os.Unsetenv("STORAGE_TYPE")
-	os.Unsetenv("COUCHDB_URL")
-	os.Unsetenv("COUCHDB_DB")
-	os.Unsetenv("MONGODB_URI")
-	os.Unsetenv("MONGODB_DB")
-	os.Unsetenv("MONGODB_COLLECTION")
 }
 
 func TestGetEnv(t *testing.T) {
@@ -79,12 +71,9 @@ func TestGetEnv(t *testing.T) {
 	}
 
 	// Test environment variable override
-	os.Setenv("TEST_VAR", "test_value")
+	t.Setenv("TEST_VAR", "test_value")
 	value = getEnv("TEST_VAR", "default")
 	if value != "test_value" {
 		t.Errorf("Expected 'test_value', got %s", value)
 	}
-
-	// Clean up
-	os.Unsetenv("TEST_VAR")
 }

@@ -53,8 +53,14 @@ func TestApp_InitializeWithCouchDB(t *testing.T) {
 
 	defer func() {
 		// Clean up: delete the notes database
-		req, _ := http.NewRequest(http.MethodDelete, couchURL+"/notes", nil)
-		http.DefaultClient.Do(req)
+		req, err := http.NewRequest(http.MethodDelete, couchURL+"/notes", nil)
+		if err != nil {
+			return
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err == nil && resp != nil {
+			_ = resp.Body.Close()
+		}
 	}()
 
 	// Create app with CouchDB config
@@ -81,7 +87,7 @@ func TestApp_InitializeWithCouchDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create CouchDB database: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusPreconditionFailed {
 		t.Fatalf("Failed to create CouchDB database: %s", resp.Status)
 	}
@@ -108,7 +114,9 @@ func TestApp_InitializeWithCouchDB(t *testing.T) {
 	}
 
 	// Clean up
-	defer app.storage.Close(ctx)
+	if err := app.storage.Close(ctx); err != nil {
+		t.Logf("storage close error: %v", err)
+	}
 }
 
 func TestApp_InitializeWithMongoDB(t *testing.T) {
@@ -171,7 +179,9 @@ func TestApp_InitializeWithMongoDB(t *testing.T) {
 	}
 
 	// Clean up
-	defer app.storage.Close(ctx)
+	if err := app.storage.Close(ctx); err != nil {
+		t.Logf("storage close error: %v", err)
+	}
 }
 
 func TestApp_CreateSampleNotes(t *testing.T) {
@@ -574,7 +584,9 @@ func TestApp_StartServers(t *testing.T) {
 	// Clean up
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	app.restServer.Shutdown(shutdownCtx)
+	if err := app.restServer.Shutdown(shutdownCtx); err != nil {
+		t.Logf("rest shutdown error: %v", err)
+	}
 	// gRPC server cleanup is handled by the context timeout
 }
 

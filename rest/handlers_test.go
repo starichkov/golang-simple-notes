@@ -227,8 +227,14 @@ func TestGetAllNotes(t *testing.T) {
 		// Add some notes to the storage
 		note1 := model.NewNote("Title 1", "Content 1")
 		note2 := model.NewNote("Title 2", "Content 2")
-		mockStorage.Create(context.Background(), note1)
-		mockStorage.Create(context.Background(), note2)
+		err1 := mockStorage.Create(context.Background(), note1)
+		if err1 != nil {
+			return
+		}
+		err2 := mockStorage.Create(context.Background(), note2)
+		if err2 != nil {
+			return
+		}
 
 		req := setupTestRequest("GET", "/api/notes", "")
 		w := httptest.NewRecorder()
@@ -279,7 +285,10 @@ func TestGetNote(t *testing.T) {
 
 		// Add a note to the storage with a valid ID
 		note := &model.Note{ID: "testid123", Title: "Test Title", Content: "Test Content"}
-		mockStorage.Create(context.Background(), note)
+		errC := mockStorage.Create(context.Background(), note)
+		if errC != nil {
+			return
+		}
 
 		req := setupTestRequest("GET", "/api/notes/"+note.ID, "")
 		chiCtx := chi.NewRouteContext()
@@ -358,7 +367,10 @@ func TestUpdateNote(t *testing.T) {
 
 		// Add a note to the storage with a valid ID
 		note := &model.Note{ID: "testid123", Title: "Original Title", Content: "Original Content"}
-		mockStorage.Create(context.Background(), note)
+		errC := mockStorage.Create(context.Background(), note)
+		if errC != nil {
+			return
+		}
 
 		reqBody := `{"title":"Updated Title","content":"Updated Content"}`
 		req := setupTestRequest("PUT", "/api/notes/"+note.ID, reqBody)
@@ -467,7 +479,10 @@ func TestDeleteNote(t *testing.T) {
 
 		// Add a note to the storage with a valid ID
 		note := &model.Note{ID: "testid123", Title: "Test Title", Content: "Test Content"}
-		mockStorage.Create(context.Background(), note)
+		errC := mockStorage.Create(context.Background(), note)
+		if errC != nil {
+			return
+		}
 
 		req := setupTestRequest("DELETE", "/api/notes/"+note.ID, "")
 		chiCtx := chi.NewRouteContext()

@@ -50,7 +50,10 @@ func acquireLock() (*os.File, error) {
 		f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if err == nil {
 			// Write our PID to the lock file
-			fmt.Fprintf(f, "%d", os.Getpid())
+			_, errF := fmt.Fprintf(f, "%d", os.Getpid())
+			if errF != nil {
+				return nil, errF
+			}
 			return f, nil
 		}
 		// Lock file exists, wait and retry
@@ -62,8 +65,14 @@ func acquireLock() (*os.File, error) {
 // releaseLock releases the file-based lock
 func releaseLock(f *os.File) {
 	if f != nil {
-		f.Close()
-		os.Remove(getLockFilePath())
+		errC := f.Close()
+		if errC != nil {
+			return
+		}
+		errR := os.Remove(getLockFilePath())
+		if errR != nil {
+			return
+		}
 	}
 }
 
@@ -185,8 +194,10 @@ func TestMain(m *testing.M) {
 			}
 		}
 
-		// Clean up state file
-		os.Remove(getStateFilePath())
+		errD := os.Remove(getStateFilePath())
+		if errD != nil {
+			return
+		}
 	}
 
 	os.Exit(code)

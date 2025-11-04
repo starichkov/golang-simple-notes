@@ -59,7 +59,10 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 		// Clean up storage before test
 		notes, _ := storage.GetAll(ctx)
 		for _, n := range notes {
-			storage.Delete(ctx, n.ID)
+			err := storage.Delete(ctx, n.ID)
+			if err != nil {
+				return
+			}
 		}
 
 		// Create the initial note again
@@ -192,7 +195,10 @@ func TestInMemoryStorageConcurrency(t *testing.T) {
 		// Clean up storage before test
 		notes, _ := storage.GetAll(ctx)
 		for _, n := range notes {
-			storage.Delete(ctx, n.ID)
+			err := storage.Delete(ctx, n.ID)
+			if err != nil {
+				return
+			}
 		}
 
 		// Create notes to delete with guaranteed unique IDs

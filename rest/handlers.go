@@ -72,7 +72,9 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 // This endpoint can be used by load balancers or monitoring tools to check if the service is healthy.
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK) // Set the status code to 200 OK
-	w.Write([]byte("OK"))        // Write a simple "OK" response
+	if _, err := w.Write([]byte("OK")); err != nil {
+		_ = err // cannot change status code; ignore write error
+	}
 }
 
 // getAllNotes handles GET /api/notes.

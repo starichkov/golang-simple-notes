@@ -37,7 +37,12 @@ func TestMongoDBStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to MongoDB container: %v", err)
 	}
-	defer client.Disconnect(ctx)
+	defer func(client *mongo.Client, ctx context.Context) {
+		err := client.Disconnect(ctx)
+		if err != nil {
+			t.Logf("Warning: Failed to disconnect from MongoDB container: %v", err)
+		}
+	}(client, ctx)
 
 	// Ping the MongoDB server to verify connection
 	err = client.Ping(ctx, nil)
@@ -174,7 +179,12 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to MongoDB container: %v", err)
 	}
-	defer client.Disconnect(ctx)
+	defer func(client *mongo.Client, ctx context.Context) {
+		err := client.Disconnect(ctx)
+		if err != nil {
+			t.Logf("Warning: Failed to disconnect from MongoDB container: %v", err)
+		}
+	}(client, ctx)
 
 	// Ping the MongoDB server to verify connection
 	err = client.Ping(ctx, nil)
@@ -193,7 +203,7 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create MongoDB storage: %v", err)
 	}
-	defer storage.Close(ctx)
+	CleanupCloseWithContext(t, ctx, storage)
 
 	// Test that the unique index on ID works
 	t.Run("UniqueIDIndex", func(t *testing.T) {
@@ -229,13 +239,15 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		// Test Create error
 		t.Run("CreateError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
 			invalidURI := "mongodb://invalid:27017"
-			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badClient, _ := mongo.Connect(ctx, options.Client().ApplyURI(invalidURI))
 			badStorage := &MongoDBStorage{
 				client:     badClient,
 				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
-			defer badStorage.Close(errorCtx)
+			CleanupCloseWithContext(t, errorCtx, badStorage)
 
 			note := model.NewNote("Error Note", "This should fail to create")
 			err := badStorage.Create(errorCtx, note)
@@ -247,13 +259,15 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		// Test Get error (other than not found)
 		t.Run("GetError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
 			invalidURI := "mongodb://invalid:27017"
-			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badClient, _ := mongo.Connect(ctx, options.Client().ApplyURI(invalidURI))
 			badStorage := &MongoDBStorage{
 				client:     badClient,
 				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
-			defer badStorage.Close(errorCtx)
+			CleanupCloseWithContext(t, errorCtx, badStorage)
 
 			_, err := badStorage.Get(errorCtx, "some-id")
 			if err == nil {
@@ -264,13 +278,15 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		// Test GetAll error
 		t.Run("GetAllError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
 			invalidURI := "mongodb://invalid:27017"
-			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badClient, _ := mongo.Connect(ctx, options.Client().ApplyURI(invalidURI))
 			badStorage := &MongoDBStorage{
 				client:     badClient,
 				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
-			defer badStorage.Close(errorCtx)
+			CleanupCloseWithContext(t, errorCtx, badStorage)
 
 			_, err := badStorage.GetAll(errorCtx)
 			if err == nil {
@@ -281,13 +297,15 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		// Test Update error (other than not found)
 		t.Run("UpdateError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
 			invalidURI := "mongodb://invalid:27017"
-			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badClient, _ := mongo.Connect(ctx, options.Client().ApplyURI(invalidURI))
 			badStorage := &MongoDBStorage{
 				client:     badClient,
 				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
-			defer badStorage.Close(errorCtx)
+			CleanupCloseWithContext(t, errorCtx, badStorage)
 
 			note := model.NewNote("Error Note", "This should fail to update")
 			err := badStorage.Update(errorCtx, note)
@@ -299,13 +317,15 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 		// Test Delete error (other than not found)
 		t.Run("DeleteError", func(t *testing.T) {
 			// Create a storage with an invalid client to simulate an error
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
 			invalidURI := "mongodb://invalid:27017"
-			badClient, _ := mongo.NewClient(options.Client().ApplyURI(invalidURI))
+			badClient, _ := mongo.Connect(ctx, options.Client().ApplyURI(invalidURI))
 			badStorage := &MongoDBStorage{
 				client:     badClient,
 				collection: badClient.Database("test_db").Collection("test_collection"),
 			}
-			defer badStorage.Close(errorCtx)
+			CleanupCloseWithContext(t, errorCtx, badStorage)
 
 			err := badStorage.Delete(errorCtx, "some-id")
 			if err == nil {

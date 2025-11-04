@@ -36,7 +36,7 @@ func TestCouchDBStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to CouchDB container: %v", err)
 	}
-	defer client.Close()
+	CleanupClose(t, client)
 
 	// Check if the server is available
 	_, err = client.AllDBs(ctx)
@@ -94,7 +94,7 @@ func NewMockCouchDBStorage() *MockCouchDBStorage {
 
 // Create adds a new note to the storage
 func (s *MockCouchDBStorage) Create(_ context.Context, note *model.Note) error {
-	// Check if note with the same ID already exists
+	// Check if a note with the same ID already exists
 	if _, exists := s.notes[note.ID]; exists {
 		return fmt.Errorf("note with ID %s already exists", note.ID)
 	}
@@ -150,7 +150,7 @@ func (s *MockCouchDBStorage) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-// Close closes any resources used by the storage
+// Close close any resources used by the storage
 func (s *MockCouchDBStorage) Close(_ context.Context) error {
 	// Nothing to close for mock storage
 	return nil
@@ -179,7 +179,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to CouchDB container: %v", err)
 	}
-	defer client.Close()
+	CleanupClose(t, client)
 
 	// Check if the server is available
 	_, err = client.AllDBs(ctx)
@@ -204,7 +204,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create CouchDB storage: %v", err)
 	}
-	defer storage.Close(ctx)
+	CleanupCloseWithContext(t, ctx, storage)
 
 	// Test document revision handling
 	t.Run("DocumentRevision", func(t *testing.T) {
@@ -253,7 +253,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create CouchDB storage: %v", err)
 		}
-		defer storage.Close(ctx)
+		CleanupCloseWithContext(t, ctx, storage)
 
 		// Create a design document directly using the CouchDB client
 		designDoc := map[string]interface{}{
@@ -280,7 +280,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 
 		// Print all documents in the database for debugging
 		rows := db.AllDocs(ctx)
-		defer rows.Close()
+		CleanupClose(t, rows)
 		t.Log("All documents in the database:")
 		for rows.Next() {
 			var id string
@@ -322,7 +322,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 				client: client,
 				db:     client.DB("non_existent_db"), // Use a non-existent database
 			}
-			defer badStorage.Close(ctx)
+			CleanupCloseWithContext(t, ctx, badStorage)
 
 			note := model.NewNote("Error Note", "This should fail to create")
 			err := badStorage.Create(ctx, note)
@@ -342,7 +342,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 				client: client,
 				db:     client.DB(dbName),
 			}
-			defer badStorage.Close(ctx)
+			CleanupCloseWithContext(t, ctx, badStorage)
 
 			_, err := badStorage.Get(canceledCtx, "some-id")
 			if err == nil {
@@ -361,7 +361,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 				client: client,
 				db:     client.DB(dbName),
 			}
-			defer badStorage.Close(ctx)
+			CleanupCloseWithContext(t, ctx, badStorage)
 
 			_, err := badStorage.GetAll(canceledCtx)
 			if err == nil {
@@ -380,7 +380,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 				client: client,
 				db:     client.DB(dbName),
 			}
-			defer badStorage.Close(ctx)
+			CleanupCloseWithContext(t, ctx, badStorage)
 
 			note := model.NewNote("Error Note", "This should fail to update")
 			err := badStorage.Update(canceledCtx, note)
@@ -400,7 +400,7 @@ func TestCouchDBSpecificFeatures(t *testing.T) {
 				client: client,
 				db:     client.DB(dbName),
 			}
-			defer badStorage.Close(ctx)
+			CleanupCloseWithContext(t, ctx, badStorage)
 
 			err := badStorage.Delete(canceledCtx, "some-id")
 			if err == nil {
