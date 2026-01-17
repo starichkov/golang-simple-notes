@@ -240,7 +240,12 @@ func startSharedCouchDBContainer(ctx context.Context) error {
 			"COUCHDB_USER":     "admin",
 			"COUCHDB_PASSWORD": "password",
 		},
-		WaitingFor: wait.ForHTTP("/").WithPort("5984/tcp"),
+		WaitingFor: wait.ForHTTP("/_all_dbs").
+			WithPort("5984/tcp").
+			WithBasicAuth("admin", "password").
+			WithStatusCodeMatcher(func(status int) bool {
+				return status == 200
+			}),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

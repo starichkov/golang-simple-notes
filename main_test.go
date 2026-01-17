@@ -228,7 +228,12 @@ func startSharedCouchDBContainer(ctx context.Context) error {
 	req := testcontainers.ContainerRequest{
 		Image:        "couchdb:3.5.1",
 		ExposedPorts: []string{"5984/tcp"},
-		WaitingFor:   wait.ForListeningPort("5984/tcp"),
+		WaitingFor: wait.ForHTTP("/_all_dbs").
+			WithPort("5984/tcp").
+			WithBasicAuth("admin", "password").
+			WithStatusCodeMatcher(func(status int) bool {
+				return status == 200
+			}),
 		Env: map[string]string{
 			"COUCHDB_USER":     "admin",
 			"COUCHDB_PASSWORD": "password",
