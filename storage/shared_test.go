@@ -205,7 +205,7 @@ func TestMain(m *testing.M) {
 
 func startSharedMongoDBContainer(ctx context.Context) error {
 	container, err := mongodb.Run(ctx,
-		"mongo:7.0.25-jammy",
+		"mongo:7.0.28-jammy",
 		mongodb.WithUsername("admin"),
 		mongodb.WithPassword("password"),
 	)
@@ -234,7 +234,7 @@ func startSharedMongoDBContainer(ctx context.Context) error {
 
 func startSharedCouchDBContainer(ctx context.Context) error {
 	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.4.3",
+		Image:        "couchdb:3.5.1",
 		ExposedPorts: []string{"5984/tcp"},
 		Env: map[string]string{
 			"COUCHDB_USER":     "admin",

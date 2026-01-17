@@ -3,6 +3,8 @@
 package model
 
 import (
+	"crypto/rand"
+	"fmt"
 	"time"
 )
 
@@ -35,14 +37,26 @@ func NewNote(title, content string) *Note {
 	}
 }
 
-// generateID creates a simple unique ID for a note based on the current timestamp.
-// The format used (year, month, day, hour, minute, second, microsecond) ensures
-// uniqueness as long as two notes aren't created in the exact same microsecond.
+// generateID creates a unique ID for a note based on the current timestamp and a random suffix.
+// The format used (year, month, day, hour, minute, second, microsecond) followed by
+// a random component ensures uniqueness even if multiple notes are created in the
+// same microsecond.
 //
 // In a production environment, you might want to use UUID or another robust ID
 // generation method to ensure global uniqueness across distributed systems.
 func generateID() string {
 	// Format the current time as a string in the format "YYYYMMDDhhmmss.microseconds"
 	// For example: "20230415123045.123456"
-	return time.Now().Format("20060102150405.000000")
+	now := time.Now().Format("20060102150405.000000")
+
+	// Add 4 random bytes (8 hex characters) to ensure uniqueness
+	b := make([]byte, 4)
+	_, err := rand.Read(b)
+	if err != nil {
+		// If random generation fails, we still return the timestamp-based ID
+		// as a fallback, although this should rarely happen.
+		return now
+	}
+
+	return fmt.Sprintf("%s.%x", now, b)
 }

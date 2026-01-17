@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -54,9 +55,20 @@ func TestGenerateID(t *testing.T) {
 		t.Errorf("Expected different IDs, got the same ID twice: %s", id1)
 	}
 
-	// Check format (should be a timestamp in the format "20060102150405.000000")
-	_, err := time.Parse("20060102150405.000000", id1)
+	// Check format (should be a timestamp in the format "20060102150405.000000" followed by a random suffix)
+	// Example: "20230415123045.123456.a1b2c3d4"
+	parts := strings.Split(id1, ".")
+	if len(parts) != 3 {
+		t.Fatalf("ID %s is not in the expected format: expected 3 parts, got %d", id1, len(parts))
+	}
+
+	timestampStr := parts[0] + "." + parts[1]
+	_, err := time.Parse("20060102150405.000000", timestampStr)
 	if err != nil {
-		t.Errorf("ID %s is not in the expected format: %v", id1, err)
+		t.Errorf("ID %s timestamp part is not in the expected format: %v", id1, err)
+	}
+
+	if len(parts[2]) != 8 {
+		t.Errorf("ID %s random part should be 8 characters, got %d", id1, len(parts[2]))
 	}
 }
