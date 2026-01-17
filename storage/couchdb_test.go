@@ -38,10 +38,19 @@ func TestCouchDBStorage(t *testing.T) {
 	}
 	CleanupClose(t, client)
 
-	// Check if the server is available
-	_, err = client.AllDBs(ctx)
-	if err != nil {
-		t.Fatalf("Failed to list databases in CouchDB container: %v", err)
+	// Check if the server is available with retries
+	// Sometimes CouchDB takes a moment to fully initialize authentication even after the port is open
+	maxAttempts := 10
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		_, err = client.AllDBs(ctx)
+		if err == nil {
+			break
+		}
+		if attempt == maxAttempts {
+			t.Fatalf("Failed to list databases in CouchDB container after %d attempts: %v", maxAttempts, err)
+		}
+		t.Logf("Attempt %d: CouchDB not ready yet (err: %v), retrying...", attempt, err)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	// Clean up any existing test database
