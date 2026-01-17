@@ -69,4 +69,4 @@ Based on golang-simple-notes by Vadim Starichkov, TemplateTasks
 https://github.com/starichkov/golang-simple-notes
 ```
 
-**Copyright © 2025 Vadim Starichkov, TemplateTasks**
+**Copyright © 2026 Vadim Starichkov, TemplateTasks**
