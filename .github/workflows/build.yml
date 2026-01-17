@@ -18,7 +18,7 @@ jobs:
       matrix:
         go-version: [ '1.21.x', '1.22.x', '1.23.x', '1.24.x', '1.25.x' ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@v5
@@ -65,7 +65,7 @@ jobs:
     needs: build
     if: ${{ always() && contains(needs.build.result, 'success') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go ${{ env.GO_LATEST }} (latest)
         uses: actions/setup-go@v5
@@ -106,7 +106,7 @@ jobs:
     needs: build
     if: ${{ always() && contains(needs.build.result, 'success') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go ${{ env.GO_LATEST }} (latest)
         uses: actions/setup-go@v5
@@ -147,7 +147,7 @@ jobs:
     needs: build
     if: ${{ always() && contains(needs.build.result, 'success') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go ${{ env.GO_LATEST }} (latest)
         uses: actions/setup-go@v5

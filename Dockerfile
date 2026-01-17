@@ -1,5 +1,5 @@
 # Use the official Golang image as the base image
-FROM golang:1.25.3-alpine3.22 AS builder
+FROM golang:1.25.6-alpine3.23 AS builder
 
 # Set the working directory
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o notes-api .
 
 # Use a minimal alpine image for the final image
-FROM alpine:3.22
+FROM alpine:3.23
 
 # Install ca-certificates for HTTPS
 RUN apk --no-cache add ca-certificates
