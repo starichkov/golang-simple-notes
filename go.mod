@@ -1,6 +1,6 @@
 module golang-simple-notes
 
-go 1.25.6
+go 1.25.12
 
 require (
 	github.com/go-chi/chi/v5 v5.2.4

@@ -5,7 +5,7 @@ This document provides essential information for developers working on the Notes
 ## 🛠 Build and Configuration
 
 ### Prerequisites
-- Go 1.25.6 or later (as specified in `go.mod`).
+- Go 1.25.12 or later (as specified in `go.mod`).
 - Docker and Docker Compose (for running with databases or integration tests).
 
 ### Compilation

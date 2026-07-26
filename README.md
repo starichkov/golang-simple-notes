@@ -23,7 +23,7 @@ A simple microservice for notes management with REST and gRPC APIs, supporting m
 
 ## 🛠 Prerequisites
 
-- **Go**: 1.25.6 or later (as specified in `go.mod`).
+- **Go**: 1.25.12 or later (as specified in `go.mod`).
 - **Docker & Docker Compose**: Required for running databases and integration tests.
 
 ## 📁 Project Structure
