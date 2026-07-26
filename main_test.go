@@ -205,7 +205,7 @@ func TestMain(m *testing.M) {
 }
 
 func startSharedMongoDBContainer(ctx context.Context) error {
-	container, err := mongodb.Run(ctx, "mongo:7.0.28-jammy")
+	container, err := mongodb.Run(ctx, "mongo:7.0.39-jammy")
 	if err != nil {
 		return fmt.Errorf("failed to start MongoDB container: %w", err)
 	}
@@ -226,7 +226,7 @@ func startSharedMongoDBContainer(ctx context.Context) error {
 
 func startSharedCouchDBContainer(ctx context.Context) error {
 	req := testcontainers.ContainerRequest{
-		Image:        "couchdb:3.5.1",
+		Image:        "couchdb:3.5.2",
 		ExposedPorts: []string{"5984/tcp"},
 		WaitingFor: wait.ForHTTP("/_all_dbs").
 			WithPort("5984/tcp").
